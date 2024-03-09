@@ -17,20 +17,37 @@ $F(t) = P(T < t)$ ... cumulative distribution function
 
 $S(t) = P(T \geq t) = 1 - F(t)$ ... survival function
 
-\$h(t) =\\frac{f(t)}{S(t)} \$ ... hazard rate
+$h(t) =\frac{f(t)}{S(t)}$... hazard rate
 
 $H(t)$ ... cumulative hazard
 
-![](images/Screenshot 2024-03-03 at 00.15.39.png)
+![](images/Screenshot%202024-03-03%20at%2000.15.39.png)
+
+*Image source: <https://arxiv.org/abs/1708.04649>*
 
 ## Censored data
 
-TO DO: explain censored data and introduce the dataset
+What distinguishes survival analysis from other areas in statistics is the data that are usually censored.
 
-```{r libs}
-library(carData)
+Censored data is **any data for which we do not know the exact event time**.
 
-```
+We distinguish between Type I and Type II censoring:
+
+-   In Type I censoring we observe all individuals for a specific time period or until failure.
+
+-   Type II censoring design can often be found in engineering, where a total of *n* objects are observed and the study ends when *r* of them fail.
+
+Observations can be *point-censored* or *interval-censored*. Let's take a look at point censoring:
+
+![](images/Screenshot%202024-03-09%20at%2011.40.41.png)
+
+Interval censoring is shown in the bottom figure:
+
+![](images/Screenshot%202024-03-09%20at%2011.54.42.png)
+
+Now let's get to know our data.
+
+## The Rossi experiment
 
 The dataset we’ll be working with today is one that was published in Peter H. Rossi, Richard A. Berk and Kenneth J. Lenihan’s 1980 book, *Money, Work, and Crime: Some Experimental Results* (<https://gwern.net/doc/sociology/1980-rossi-moneyworkandcrime.pdf>). The dataset is made available in the R *carData* package, and is described as follows:
 
@@ -39,5 +56,46 @@ The dataset we’ll be working with today is one that was published in Peter H. 
 The [documentation page](https://vincentarelbundock.github.io/Rdatasets/doc/carData/Rossi.html) describes the columns that are present in the dataset.
 
 ```{r}
+library(carData)
 dat <- Rossi
+summary(dat)
 ```
+
+Let's get to know our data better.
+
+```{r age}
+ggplot(dat, aes(x=age)) + geom_bar() + theme_bw()
+```
+
+```{r categorical}
+binary_cols <- c("fin", "wexp", "mar", "paro")
+summary(dat[, binary_cols])
+```
+
+```{r education}
+ggplot(dat, aes(x=educ)) + geom_bar() + theme_bw()
+```
+
+```{r week}
+ggplot(dat, aes(x=week)) + geom_bar() + theme_bw()
+```
+
+```{r arrest}
+summary(dat[, "arrest"])
+```
+
+**Q: What type of censored data are we dealing with?**
+
+In this workshop, we focus on the Type I censoring design, our data is right-censored and we assume non-informative censoring, which means that the distribution of survival times provides no information about the distribution of censorship times and vice versa.
+
+## How to handle censored data?
+
+-   **Complete data analysis**: ignore the censored observations
+
+-   **Imputation**
+
+-   **Dichotomized data analysis**
+
+-   **Likelihood-based approach**
+
+TODO: There are better ways to explore survival data. Survival curves, KM plots, hazard functions etc.
