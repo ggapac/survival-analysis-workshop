@@ -1,6 +1,8 @@
 ---
 title: "Survival analysis"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 # Introduction
@@ -64,6 +66,7 @@ summary(dat)
 Let's get to know our data better.
 
 ```{r age}
+library(ggplot2)
 ggplot(dat, aes(x=age)) + geom_bar() + theme_bw()
 ```
 
@@ -99,3 +102,123 @@ In this workshop, we focus on the Type I censoring design, our data is right-cen
 -   **Likelihood-based approach**
 
 TODO: There are better ways to explore survival data. Survival curves, KM plots, hazard functions etc.
+
+## Survival curves
+
+Survival functions seem to be the most intuitive for humans.
+
+$S(t) = P(T \geq t) = 1 - F(t)$ ... survival function
+
+Description: *The survival function, S(t), is a measure of the probability of survival or non-occurrence of an event up to time, t.*
+
+More intitive: *The survival function indicates the proportion of a population expected to survive beyond a certain time point, t.*
+
+![](images/example-survival-curve.png)
+
+### Terminology:
+
+- **Median survival time**: Median survival time is the time at which 50% of the population has experienced the event of interest.
+
+- ****
+
+
+
+## Kaplan-Meier curves
+
+Let's first familiarize ourselves with Kaplan-Meier curves on a toy example.
+
+| Name   | Time | Event |
+|:--------|------:|-------:|
+| Anthony| 2    | 1     |
+| Bert   | 3    | 1     |
+| Chloe  | 3    | 0     |
+| David  | 4    | 1     |
+| Elle   | 4    | 1     |
+| Fay    | 6    | 0     |
+| Gabe   | 7    | 1     |
+| Harry  | 8    | 0     |
+| Irene  | 10   | 0     |
+| Noah   | 10   | 1     |
+
+Kaplan-Meier estimator follows the equation:
+
+$\widehat{S}(t) = \prod_{i: t_i \leq t} \left(1 - \frac{d_i}{n_i}\right),$
+
+where $\widehat{S}(0) = 1$.
+
+$d_i$ ... number of events at the time $t_i$
+
+$n_i$ ... number of samples that survived up until $t_i$
+
+
+### Toy example
+
+Your task is to implement a Kaplan-Meier estimator in R.
+
+```{r echo=T, results='hide'}
+
+time <- c(2, 3, 3, 4, 4, 6, 7, 8, 10, 10)
+event <- c(1, 1, 0, 1, 1, 0, 1, 0, 0, 1)
+
+KM_curve <- function(time, event) {
+  df <- data.frame(time = time, event = event)
+  curve <- data.frame(time = c(0, unique(time)), proba = c(NA))
+
+  S <- 1
+
+  for (i in seq_along(curve$time)) {
+
+    t <- curve$time[i]
+    
+    d <- sum(df[df$time == t,]$event)
+    n <- nrow(df[df$time >= t,])
+
+    S <- S * (1 - d/n)
+    curve[i, "proba"] <- S    
+  }
+
+  return(curve)
+}
+
+curve <- KM_curve(time, event)
+```
+
+Use this function to plot the curve:
+```{r, fig.width=4, fig.height=3}
+
+plot_survival_curve <- function(curve) {
+  ggplot(curve, aes(x = time, y = proba)) +
+    geom_step() +
+    ylim(0, 1) +
+    theme_minimal() +
+    labs(x = "Time", y = "Probability", title = "Kaplan-Meier Survival Curve")
+}
+
+plot_survival_curve(curve)
+```
+
+
+### Rossi dataset
+
+Now, let's apply our knowledge and functions to our Rossi dataset.
+
+```{r echo=T, results='hide'}
+
+dat <- dat[order(dat$week),]
+rossi_curve <- KM_curve(dat$week, dat$arrest)
+
+plot_survival_curve(rossi_curve)
+```
+
+What can we conclude?
+
+TODO: two subgroups, two curves on the sample plot.
+
+
+## Hazard function
+
+TODO: explanation of hazard functions
+
+TODO: plot hazard functions
+
+TODO: relation between hazard function and survival curve
