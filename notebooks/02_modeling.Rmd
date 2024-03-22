@@ -1,0 +1,29 @@
+---
+title: "Survival analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Statistical Models in Survival Analysis
+
+## Exponential model
+
+TODO: Introduction of constant hazard
+
+TODO: Exponential survival function
+
+TODO: Idea of linear predictor in the survival function
+
+TODO: Plot survival curve
+
+## Cox Proportional Hazard model
+
+TODO: Introduce proportional hazard Idea
+
+TODO: Likelihood
+
+TODO: Runing code
+
+TODO: Interpretation of results
+
