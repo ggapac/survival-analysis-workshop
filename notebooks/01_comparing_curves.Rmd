@@ -1,0 +1,186 @@
+---
+title: "Survival analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Comparing Survival Curves
+
+Survival curve by itself tells you the proportion of the population surviving though time.
+It also tells you the median survival of the samples.
+
+But how about when you want to compare two groups or subgroups of the population?
+
+## Two Kaplan-Meier curves
+
+```{r}
+library(survival)
+library(survminer)
+
+library(carData)
+dat <- Rossi
+```
+
+
+```{r fig.width=6, fig.height=5}
+surv_obj <- Surv(time = dat$week, event = dat$arrest)
+
+# Fit Kaplan-Meier survival curve using 'fin' as the group
+km_fit <- survfit(surv_obj ~ paro, data = dat)
+
+# Plot the Kaplan-Meier curves
+ggsurvplot(km_fit, data = dat, conf.int = TRUE, 
+           ggtheme = theme_minimal(), 
+           title = "Kaplan-Meier Curves by Parole",
+           palette = c("#00AFBB", "#FC4E07"),
+           legend.title = "fin",
+           ylim = c(0.5, 1))
+```
+
+
+Let's compare CUMULATIVE hazard functions.
+```{r fig.width=6, fig.height=5}
+# Create a survival object
+surv_obj <- Surv(time = dat$week, event = dat$arrest)
+
+# Estimate cumulative hazard functions using Nelson-Aalen method
+cum_haz_fit <- survfit(surv_obj ~ paro, data = dat, type = "fleming")
+
+# Plot the cumulative hazard functions
+ggsurvplot(cum_haz_fit, data = dat, fun = "cumhaz", conf.int = TRUE,
+           ggtheme = theme_minimal(), 
+           title = "Cumulative Hazard Curves by Parole",
+           xlab = "Time", ylab = "Cumulative Hazard",
+           palette = c("#00AFBB", "#FC4E07"),
+           legend.title = "fin")
+
+```
+
+## Log-Rank Test
+
+Log-Rank test is the most widely used test for comparing two survival curves.
+
+It is based on the Chi-squared test with one degree of freedom.
+
+### Chi square test
+
+Chi-square test follows the equation:
+
+$\chi^2 = \sum \frac{(O - E)^2}{E},$
+
+where O is the number of observations and E the expected number of observations.
+
+### Log-rank in R
+
+```{r}
+log_rank_test <- survdiff(Surv(week, arrest) ~ paro, data = dat)
+print(log_rank_test)
+```
+
+### Example
+
+```{r fig.width=6, fig.height=5}
+surv_obj <- Surv(time = dat$week, event = dat$arrest)
+
+# Fit Kaplan-Meier survival curve using 'fin' as the group
+km_fit <- survfit(surv_obj ~ wexp, data = dat)
+
+# Plot the Kaplan-Meier curves
+ggsurvplot(km_fit, data = dat, conf.int = TRUE, 
+           ggtheme = theme_minimal(), 
+           title = "Kaplan-Meier Curves by fin",
+           palette = c("#00AFBB", "#FC4E07"),
+           legend.title = "fin",
+           ylim = c(0.5, 1))
+```
+
+```{r}
+log_rank_test <- survdiff(Surv(week, arrest) ~ wexp, data = dat)
+print(log_rank_test)
+```
+
+### Considerations
+
+There is one hidden property of the log-rank test we have to take into account.
+It assumes the PROPORTIONALITY OF HAZARDS.
+
+Proportional hazards assumption tells you that the hazard rate of one cohort divided by the hazard rate of the other is constant.
+Meaning, hazards are proportional in time and the ratio is constant.
+We are going to find this assumption once again in the modeling section.
+
+Log-rank test also considers only if two curves differ, but not by how much. Does not handle crossings of curves well.
+
+## Restricted Mean Survival Time (RMST)
+
+Restricted mean survival time does not make a PH assumption. It's a prefered metric in clinical trials.
+
+![](https://media.springernature.com/full/springer-static/image/chp%3A10.1007%2F978-3-031-45275-8_20/MediaObjects/543740_1_En_20_Fig2_HTML.png?as=webp)
+
+![](https://media.springernature.com/full/springer-static/image/chp%3A10.1007%2F978-3-031-45275-8_20/MediaObjects/543740_1_En_20_Fig3_HTML.png?as=webp)
+
+We need to apply domain knowledge to restrict the survival time. Samples with long survival have large impact on RMST.
+
+```{r}
+library(survival)
+
+# Creating the dataset
+data <- data.frame(
+  Time = c(2, 3, 3, 4, 4, 6, 7, 8, 10, 10),
+  Event = c(1, 1, 0, 1, 1, 0, 1, 0, 0, 1),
+  Cohort = c("A", "A", "A", "A", "B", "B", "B", "B", "B", "B")
+)
+
+# Convert to survival object
+surv_obj <- with(data, Surv(Time, Event))
+
+# Fit a Kaplan-Meier survival model for each cohort
+km_fit_A <- survfit(surv_obj ~ Cohort, data = data, subset = (Cohort == "A"))
+km_fit_B <- survfit(surv_obj ~ Cohort, data = data, subset = (Cohort == "B"))
+
+# Define a function to calculate RMST
+calculate_rmst <- function(km_fit, tau) {
+  times <- km_fit$time
+  surv_probs <- km_fit$surv
+  
+  # Ensure times are within the specified limit tau
+  valid_times <- times[times <= tau]
+  valid_surv_probs <- surv_probs[seq(length(valid_times))]
+
+  # Add the tau time point if not present
+  if (tail(valid_times, n=1) != tau) {
+    valid_times <- c(valid_times, tau)
+    valid_surv_probs <- c(valid_surv_probs, surv_probs[length(valid_times) - 1])
+  }
+
+  # Calculate the area under the survival curve up to tau
+  sum(diff(valid_times) * (valid_surv_probs[-length(valid_surv_probs)] + valid_surv_probs[-1]) / 2)
+}
+
+# Calculate RMST for both cohorts up to a time limit (e.g., 10)
+rmst_A <- calculate_rmst(km_fit_A, 10)
+rmst_B <- calculate_rmst(km_fit_B, 10)
+
+# Print the RMST results
+print(paste("RMST for Cohort A up to time 10:", rmst_A))
+print(paste("RMST for Cohort B up to time 10:", rmst_B))
+
+
+```
+
+### Showcase on the Rossi dataset
+
+```{r}
+surv_obj <- with(dat, Surv(week, arrest))
+TIME_LIMIT = 52
+
+km_fit_A <- survfit(surv_obj ~ fin, data = dat, subset = (fin == "yes"))
+km_fit_B <- survfit(surv_obj ~ fin, data = dat, subset = (fin == "no"))
+
+rmst_A <- calculate_rmst(km_fit_A, TIME_LIMIT)
+rmst_B <- calculate_rmst(km_fit_B, TIME_LIMIT)
+
+# Print the RMST results
+print(paste("RMST for Cohort A up to time 52:", rmst_A))
+print(paste("RMST for Cohort B up to time 52:", rmst_B))
+```
