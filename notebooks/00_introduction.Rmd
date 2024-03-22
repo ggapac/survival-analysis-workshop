@@ -212,13 +212,82 @@ plot_survival_curve(rossi_curve)
 
 What can we conclude?
 
-TODO: two subgroups, two curves on the sample plot.
+## Hazard rate
+
+$h(t) =\frac{f(t)}{S(t)}$... hazard rate
+
+The hazard function is the probability that the person dies in the next instant, given that it survived to time t.
+
+\[
+h(t) = \lim_{\Delta t \to 0} \frac{P(t \leq T < t + \Delta t | T \geq t)}{\Delta t}
+\]
+ 
+
+![](images/example-hazard-human.png)
+
+*Image source: <https://www.semanticscholar.org/paper/Nonparametric-Tests-for-Change-Points-in-Hazard-in-Rois/752fc67d89c018bd16d065bdd794943b182fa64e>*
+
+```{r echo=T, results='hide'}
+library('stats')
+
+time <- c(2, 3, 3, 4, 4, 6, 7, 8, 10, 10)
+event <- c(1, 1, 0, 1, 1, 0, 1, 0, 0, 1)
+
+moving_average <- function(x, n) {
+  filter <- rep(1/n, n)
+  stats::filter(x, filter, sides = 1, circular = F)
+}
+
+hazard_rate_curve <- function(time, event, filter_size) {
+  df <- data.frame(time = time, event = event)
+  curve <- data.frame(time = c(0, unique(time)), rate = c(NA))
+
+  h <- 0
+
+  for (i in seq_along(curve$time)) {
+
+    t <- curve$time[i]
+    
+    d <- sum(df[df$time == t,]$event)
+    n <- nrow(df[df$time >= t,])
+
+    curve[i, "rate"] <- d/n
+  }
+
+  ma <- moving_average(curve$rate, filter_size)
+  padding_size <- filter_size - 1
+  padded_ma <- c(curve$rate[1:(padding_size)], ma[filter_size:length(curve$rate)])
+
+  curve$rate <- padded_ma
+  return(curve)
+}
+
+hazard_curve <- hazard_rate_curve(time, event, 3)
+```
 
 
-## Hazard function
+```{r, fig.width=4, fig.height=3}
 
-TODO: explanation of hazard functions
+plot_hazard_curve <- function(curve) {
+  ggplot(curve, aes(x = time, y = rate)) +
+    geom_step() +
+    theme_minimal() +
+    labs(x = "Time", y = "Hazard Rate", title = "Hazard Rate Curve")
+}
 
-TODO: plot hazard functions
+plot_hazard_curve(hazard_curve)
+```
 
-TODO: relation between hazard function and survival curve
+### Rossi dataset
+
+Now, let's apply our knowledge and functions to our Rossi dataset.
+
+```{r echo=T, results='hide'}
+
+dat <- dat[order(dat$week),]
+rossi_hazard_curve <- hazard_rate_curve(dat$week, dat$arrest, 7)
+
+plot_hazard_curve(rossi_hazard_curve)
+```
+
+What can we conclude?
