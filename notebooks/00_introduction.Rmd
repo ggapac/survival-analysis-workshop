@@ -61,6 +61,57 @@ Interval censoring is shown in the bottom figure:
 
 -   **Likelihood-based approach**: adjust the likelihood based on whether the individual was censored or not. Mind the censoring assumptions!
 
+### Likelihood construction
+
+In a study with $n$ individuals let $t_i$ denote the observation time for the $i$-th individual and let $\delta_i$ be their event indicator ($\delta_i = 1$ if the event occurred, $\delta_i = 0$ if the individual was censored). Let $T_i$ be a random variable representing the time until the event occurs and let $C_i$ be a random variable representing the time of censoring. While either $T_i$ or $C_i$ may never be observed, together with the information about censoring we can construct a random variable that is associated with $t_i$: $\tau_i = \min{(T_i, C_i)}$. We can now take a look at the probability distribution of the pair $(\tau_i, \delta_i)$ for censored and uncensored observations.
+
+Let us first consider the case when $\delta_i = 0$:
+
+$$
+\begin{align*}
+P(\tau_i = t, \delta_i = 0) = P(C_i = t, T_i > t) \overset{\substack{\text{indep.} \\ \text{cens.}}}{=} P(C_i = t)P(T_i > t).
+\end{align*}
+$$
+
+For the sake of simplicity, we can understand $P(C_i = t)$ to be the probability density function of $C_i$ and thus get $P(\tau_i = t, \delta_i = 0) = f_{C_i}(t)S_{T_i}(t)$, where $S_{T_i}(t)$ is the survival function of $T_i$. Let us now consider the case when $\delta_i = 1$:
+
+$$
+\begin{align*}
+P(\tau_i = t, \delta_i = 1) = P(T_i = t, C_i > t) \overset{\substack{\text{indep.} \\ \text{cens.}}}{=} P(T_i = t)P(C_i > t).
+\end{align*}
+$$
+
+Again, let us say simplify and say that $P(T_i = t)$ equals to $f_{T_i}(t)$, which gives us $P(\tau_i = t, \delta_i = 1) = f_{T_i}(t)S_{C_i}(t)$, where $S_{C_i}(t)$ is the survival function of $C_i$.
+
+Joining the two results and taking into account all $n$ individuals gives us the following expression:
+
+$$
+\begin{align*}
+\prod_{i=1}^{n}\left[f_{T_i}(t_i)S_{C_i}(t_i)\right]^{\delta_i} \left[f_{C_i}(t_i)S_{T_i}(t_i)\right]^{(1-\delta_i)},
+\end{align*} 
+$$ which we can rewrite as
+
+$$
+\begin{align*}
+\prod_{i=1}^{n}f_{T_i}(t_i)^{\delta_i}S_{T_i}(t_i)^{(1-\delta_i)}
+\prod_{i=1}^{n}f_{C_i}(t_i)^{(1-\delta_i)}S_{C_i}(t_i)^{\delta_i}.
+\end{align*}
+$$
+
+Since we are interested in the distribution of survival times the second product term can be seen as a constant on account of the assumption of non-informative censoring, which states that the distribution of $C_i$ does not involve any parameters relevant to the distribution of $T_i$ (and vice versa). Finally, the likelihood can therefore be defined as:
+
+$$
+\begin{align*}
+\mathcal{L} = \prod_{i=1}^{n}f_{T_i}(t_i)^{\delta_i}S_{T_i}(t_i)^{(1-\delta_i)},
+\end{align*}
+$$ or, considering the hazard rate definition and simplifying the indexing, its alternative formulation is
+
+$$
+\begin{align}
+\mathcal{L} = \prod_{i=1}^{n}h(t_i)^{\delta_i}S(t_i).
+\end{align}
+$$
+
 Now let's get to know our data.
 
 ## Veterans' Administration Lung Cancer study
