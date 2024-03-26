@@ -60,7 +60,7 @@ plot_survival_curve <- function(lambda) {
 }
 
 # Example usage of the function
-LAMBDA <- 1.0
+LAMBDA <- 1
 plot_survival_curve(LAMBDA)
 ```
 
@@ -112,7 +112,7 @@ plot_survival_comparison <- function(dat, lambda) {
   ggplot() +
     geom_step(data = km_data, aes(x = Time, y = Survival), col = "blue") +
     geom_line(data = theoretical_data, aes(x = Time, y = Survival), col = "red") +
-    ggtitle(paste("Rossi (KM) vs. Exponential (Lambda =", lambda, ") Survival Curves")) +
+    ggtitle(paste("Veterans (KM) vs. Exponential (Lambda =", lambda, ") Survival Curves")) +
     xlab("Time") +
     ylab("Survival Probability") +
     theme_minimal() +
@@ -121,7 +121,7 @@ plot_survival_comparison <- function(dat, lambda) {
 }
 
 # Change the parameter LAMBDA and observe the change on the plot
-LAMBDA <- 1.0
+LAMBDA <- 1
 plot_survival_comparison(dat, LAMBDA)
 ```
 
@@ -187,7 +187,7 @@ ggsurvplot(km_fit, data = dat, conf.int = TRUE,
            ggtheme = theme_minimal(), 
            title = "Kaplan-Meier Curves",
            #palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "fin")
+           legend.title = "treatment")
 ```
 
 ```{r}
@@ -291,7 +291,7 @@ plot_weibull_comparison <- function(dat, lambda, k) {
   ggplot() +
     geom_step(data = km_data, aes(x = Time, y = Survival), col = "blue") +
     geom_line(data = theoretical_data, aes(x = Time, y = Survival), col = "red") +
-    ggtitle(paste("Rossi (KM) vs. Weibull (Lambda =", lambda, ", k =", k, ")")) +
+    ggtitle(paste("Veterans (KM) vs. Weibull (Lambda =", lambda, ", k =", k, ")")) +
     xlab("Time") +
     ylab("Survival Probability") +
     theme_minimal() +
@@ -300,8 +300,8 @@ plot_weibull_comparison <- function(dat, lambda, k) {
 }
 
 # Change the parameter LAMBDA and observe the change on the plot
-LAMBDA <- 0.00808
-K = 1.365
+LAMBDA <- 1
+K = 1
 plot_weibull_comparison(dat, LAMBDA, K)
 ```
 
@@ -434,31 +434,28 @@ ggsurvplot(fit, data = toy_data, conf.int = TRUE,
            palette = c("#00AFBB", "#FC4E07"),
            title = "Survival Curves based on Cox Model",
            legend.title = "Treatment Group")
-
 ```
 
-### CoxPH on Rossi dataset
+### CoxPH on Veterans dataset
 
 ```{r}
-cox_model <- coxph(Surv(dat$time, dat$status) ~ treatment + prior, data = dat)
+cox_model <- coxph(Surv(dat$time, dat$status) ~ treatment + prior + celltype, data = dat)
 
 summary(cox_model)
 ```
 
 ```{r, fig.width=6, fig.height=5}
 
-fixed_fin <- median(dat$fin == 'yes')  # Replace with appropriate summary statistic
-fixed_paro <- median(dat$paro == 'yes')
-fixed_mar <- median(dat$mar == 'yes')
+fixed_treatment <- 'standard'  # Replace with appropriate summary statistic
+fixed_prior <- 0
 
 # Creating survival curves for different levels of the 'mar' variable
-fit_mar <- survfit(cox_model, newdata = data.frame(mar = 0:1, fin = fixed_fin, paro = fixed_paro))
+fit_mar <- survfit(cox_model, newdata = data.frame(treatment = fixed_treatment, prior = fixed_prior, celltype = unique(dat$celltype)))
 
 # Plot the survival curves
 ggsurvplot(fit_mar, data = dat, conf.int = TRUE,
            ggtheme = theme_minimal(),
-           palette = c("#00AFBB", "#FC4E07"),
-           title = "Survival Curves by Marital Status",
-           legend.title = "Marital Status",
-           ylim = c(0.5, 1))
+           #palette = c("#00AFBB", "#FC4E07"),
+           title = "Survival Curves by Celltype",
+           legend.title = "Cell type")
 ```
