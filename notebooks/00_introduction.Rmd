@@ -9,6 +9,8 @@ output:
 
 TO DO: Describe different namings, definition, examples
 
+It is also known as *lifetime data analysis*, *reliability analysis*, *time to event analysis*, and *event history analysis* depending on the type of application.
+
 ## Fundamental concepts
 
 $T$ ... non-negative continuous random variable representing the time until the event occurs
@@ -33,6 +35,8 @@ What distinguishes survival analysis from other areas in statistics is the data 
 
 Censored data is **any data for which we do not know the exact event time**.
 
+For a survival problem, the time to the event of interest ($T$) is known precisely only for those instances where the event occurs during the study period.
+
 We distinguish between Type I and Type II censoring:
 
 -   In Type I censoring we observe all individuals for a specific time period or until failure.
@@ -47,61 +51,158 @@ Interval censoring is shown in the bottom figure:
 
 ![](images/Screenshot%202024-03-09%20at%2011.54.42.png)
 
+## How to handle censored data?
+
+-   **Complete data analysis**: ignore the censored observations.
+
+-   **Imputation**: make (false?) assumptions about censored observations.
+
+-   **Dichotomized data analysis**: binarize the problem, e.g. only focus on whether the event occurred or not.
+
+-   **Likelihood-based approach**: adjust the likelihood based on whether the individual was censored or not. Mind the censoring assumptions!
+
+### Likelihood construction
+
+In a study with $n$ individuals let $t_i$ denote the observation time for the $i$-th individual and let $\delta_i$ be their event indicator ($\delta_i = 1$ if the event occurred, $\delta_i = 0$ if the individual was censored). Let $T_i$ be a random variable representing the time until the event occurs and let $C_i$ be a random variable representing the time of censoring. While either $T_i$ or $C_i$ may never be observed, together with the information about censoring we can construct a random variable that is associated with $t_i$: $\tau_i = \min{(T_i, C_i)}$. We can now take a look at the probability distribution of the pair $(\tau_i, \delta_i)$ for censored and uncensored observations.
+
+Let us first consider the case when $\delta_i = 0$:
+
+$$
+\begin{align*}
+P(\tau_i = t, \delta_i = 0) = P(C_i = t, T_i > t) \overset{\substack{\text{indep.} \\ \text{cens.}}}{=} P(C_i = t)P(T_i > t).
+\end{align*}
+$$
+
+For the sake of simplicity, we can understand $P(C_i = t)$ to be the probability density function of $C_i$ and thus get $P(\tau_i = t, \delta_i = 0) = f_{C_i}(t)S_{T_i}(t)$, where $S_{T_i}(t)$ is the survival function of $T_i$. Let us now consider the case when $\delta_i = 1$:
+
+$$
+\begin{align*}
+P(\tau_i = t, \delta_i = 1) = P(T_i = t, C_i > t) \overset{\substack{\text{indep.} \\ \text{cens.}}}{=} P(T_i = t)P(C_i > t).
+\end{align*}
+$$
+
+Again, let us say simplify and say that $P(T_i = t)$ equals to $f_{T_i}(t)$, which gives us $P(\tau_i = t, \delta_i = 1) = f_{T_i}(t)S_{C_i}(t)$, where $S_{C_i}(t)$ is the survival function of $C_i$.
+
+Joining the two results and taking into account all $n$ individuals gives us the following expression:
+
+$$
+\begin{align*}
+\prod_{i=1}^{n}\left[f_{T_i}(t_i)S_{C_i}(t_i)\right]^{\delta_i} \left[f_{C_i}(t_i)S_{T_i}(t_i)\right]^{(1-\delta_i)},
+\end{align*} 
+$$ which we can rewrite as
+
+$$
+\begin{align*}
+\prod_{i=1}^{n}f_{T_i}(t_i)^{\delta_i}S_{T_i}(t_i)^{(1-\delta_i)}
+\prod_{i=1}^{n}f_{C_i}(t_i)^{(1-\delta_i)}S_{C_i}(t_i)^{\delta_i}.
+\end{align*}
+$$
+
+Since we are interested in the distribution of survival times the second product term can be seen as a constant on account of the assumption of non-informative censoring, which states that the distribution of $C_i$ does not involve any parameters relevant to the distribution of $T_i$ (and vice versa). Finally, the likelihood can therefore be defined as:
+
+$$
+\begin{align*}
+\mathcal{L} = \prod_{i=1}^{n}f_{T_i}(t_i)^{\delta_i}S_{T_i}(t_i)^{(1-\delta_i)},
+\end{align*}
+$$ or, considering the hazard rate definition and simplifying the indexing, its alternative formulation is
+
+$$
+\begin{align}
+\mathcal{L} = \prod_{i=1}^{n}h(t_i)^{\delta_i}S(t_i).
+\end{align}
+$$
+
 Now let's get to know our data.
 
-## The Rossi experiment
+## Veterans' Administration Lung Cancer study
 
-The dataset we’ll be working with today is one that was published in Peter H. Rossi, Richard A. Berk and Kenneth J. Lenihan’s 1980 book, *Money, Work, and Crime: Some Experimental Results* (<https://gwern.net/doc/sociology/1980-rossi-moneyworkandcrime.pdf>). The dataset is made available in the R *carData* package, and is described as follows:
+The dataset we’ll be working with today is one that was published in *The Statistical Analysis of Failure Time Data* by Kalbfleisch and Prentice. It is described as follows:
 
-> This data set is originally from Rossi et al. (1980), and is used as an example in Allison (1995). The data pertain to 432 convicts who were released from Maryland state prisons in the 1970s and who were followed up for one year after release. Half the released convicts were assigned at random to an experimental treatment in which they were given financial aid; half did not receive aid.
+> In this trial, **137** males with advanced inoperable lung cancer were randomized to either a standard or test chemotherapy. The primary endpoint for therapy comparison was time to death. Only 9 of the 137 survival times were censored.
 
-The [documentation page](https://vincentarelbundock.github.io/Rdatasets/doc/carData/Rossi.html) describes the columns that are present in the dataset.
+The dataset is made available in the R *survival* package.
 
 ```{r}
-library(carData)
-dat <- Rossi
-summary(dat)
+library(survival)
 ```
 
-Let's get to know our data better.
+Columns:
+
+-   `trt`: treatment, 1=standard, 2=test
+-   `celltype`: histological type of tumor
+-   `time`: survival time (in days)
+-   `status`: censoring status, 1=death, 0=censored
+-   `karno`: Karnofsky performance score (100 means good)
+-   `diagtime`: months from diagnosis to treatment
+-   `age`: age in years
+-   `prior`: prior therapy, 0=no, 10=yes
+
+```{r}
+dat <- veteran
+summary(veteran)
+```
+
+```{r treatment}
+# preprocess: standard=0, test=1
+dat$trt <- dat$trt - 1
+treatment <- factor(dat$trt, levels=c(0,1), labels=c("standard", "test"))
+table(treatment)
+```
 
 ```{r age}
 library(ggplot2)
-ggplot(dat, aes(x=age)) + geom_bar() + theme_bw()
+ggplot(dat, aes(x=age)) + 
+    geom_bar() + 
+    xlab("age in years") +
+    theme_bw()
 ```
 
-```{r categorical}
-binary_cols <- c("fin", "wexp", "mar", "paro")
-summary(dat[, binary_cols])
+```{r diagtime}
+ggplot(dat, aes(diagtime)) +
+    geom_bar() + 
+    xlab("months from diagnosis to treatment") +
+    theme_bw()
 ```
 
-```{r education}
-ggplot(dat, aes(x=educ)) + geom_bar() + theme_bw()
+```{r celltype}
+ggplot(dat, aes(x=celltype)) + 
+    geom_bar() + 
+    xlab("cell type") + 
+    theme_bw()
 ```
 
-```{r week}
-ggplot(dat, aes(x=week)) + geom_bar() + theme_bw()
+```{r prior}
+# preprocess, prior therapy 1=yes, 0=no
+dat$prior <- dat$prior / 10
+prior <- factor(dat$prior, levels=c(0,1), labels=c("no", "yes"))
+table(prior)
 ```
 
-```{r arrest}
-summary(dat[, "arrest"])
+```{r karno}
+ggplot(dat, aes(x=karno)) + 
+    geom_bar() + 
+    xlab("Karnofsky performance score") + 
+    scale_x_continuous(breaks = seq(0, 100, by=5)) +
+    theme_bw()
+```
+
+```{r time}
+ggplot(dat, aes(x=time)) + 
+    geom_histogram(binwidth=20) + 
+    xlab("time [days]") + 
+    theme_bw()
+```
+
+```{r status}
+status <- factor(dat$status, levels=c(0, 1), labels = c("censored", "death"))
+table(status)
 ```
 
 **Q: What type of censored data are we dealing with?**
 
 In this workshop, we focus on the Type I censoring design, our data is right-censored and we assume non-informative censoring, which means that the distribution of survival times provides no information about the distribution of censorship times and vice versa.
 
-## How to handle censored data?
-
--   **Complete data analysis**: ignore the censored observations
-
--   **Imputation**
-
--   **Dichotomized data analysis**
-
--   **Likelihood-based approach**
-
-TODO: There are better ways to explore survival data. Survival curves, KM plots, hazard functions etc.
+There are better ways to explore survival data. Let's see how.
 
 ## Survival curves
 
@@ -115,41 +216,36 @@ More intitive: *The survival function indicates the proportion of a population e
 
 ![](images/example-survival-curve.png)
 
-### Terminology:
-
-- **Median survival time**: Median survival time is the time at which 50% of the population has experienced the event of interest.
-
-- ****
-
-
+-   **Median survival time**: Median survival time is the time at which 50% of the population has experienced the event of interest.
 
 ## Kaplan-Meier curves
 
 Let's first familiarize ourselves with Kaplan-Meier curves on a toy example.
 
-| Name   | Time | Event |
-|:--------|------:|-------:|
-| Anthony| 2    | 1     |
-| Bert   | 3    | 1     |
-| Chloe  | 3    | 0     |
-| David  | 4    | 1     |
-| Elle   | 4    | 1     |
-| Fay    | 6    | 0     |
-| Gabe   | 7    | 1     |
-| Harry  | 8    | 0     |
-| Irene  | 10   | 0     |
-| Noah   | 10   | 1     |
+| Name    | Time | Event |
+|:--------|-----:|------:|
+| Anthony |    2 |     1 |
+| Bert    |    3 |     1 |
+| Chloe   |    3 |     0 |
+| David   |    4 |     1 |
+| Elle    |    4 |     1 |
+| Fay     |    6 |     0 |
+| Gabe    |    7 |     1 |
+| Harry   |    8 |     0 |
+| Irene   |   10 |     0 |
+| Noah    |   10 |     1 |
 
 Kaplan-Meier estimator follows the equation:
 
-$\widehat{S}(t) = \prod_{i: t_i \leq t} \left(1 - \frac{d_i}{n_i}\right),$
+\[
+  \widehat{S}(t) = \prod_{i: t_i \leq t} \left(1 - \frac{d_i}{n_i}\right),
+\]
 
 where $\widehat{S}(0) = 1$.
 
 $d_i$ ... number of events at the time $t_i$
 
 $n_i$ ... number of samples that survived up until $t_i$
-
 
 ### Toy example
 
@@ -184,6 +280,7 @@ curve <- KM_curve(time, event)
 ```
 
 Use this function to plot the curve:
+
 ```{r, fig.width=4, fig.height=3}
 
 plot_survival_curve <- function(curve) {
@@ -197,17 +294,16 @@ plot_survival_curve <- function(curve) {
 plot_survival_curve(curve)
 ```
 
+### Veterans dataset
 
-### Rossi dataset
-
-Now, let's apply our knowledge and functions to our Rossi dataset.
+Now, let's apply our knowledge and functions to our Veterans dataset.
 
 ```{r echo=T, results='hide'}
 
-dat <- dat[order(dat$week),]
-rossi_curve <- KM_curve(dat$week, dat$arrest)
+dat <- dat[order(dat$time),]
+veterans_curve <- KM_curve(dat$time, dat$status)
 
-plot_survival_curve(rossi_curve)
+plot_survival_curve(veterans_curve)
 ```
 
 What can we conclude?
@@ -218,10 +314,10 @@ $h(t) =\frac{f(t)}{S(t)}$... hazard rate
 
 The hazard function is the probability that the person dies in the next instant, given that it survived to time t.
 
-\[
+$$
 h(t) = \lim_{\Delta t \to 0} \frac{P(t \leq T < t + \Delta t | T \geq t)}{\Delta t}
-\]
- 
+$$
+
 
 ![](images/example-hazard-human.png)
 
@@ -265,7 +361,6 @@ hazard_rate_curve <- function(time, event, filter_size) {
 hazard_curve <- hazard_rate_curve(time, event, 3)
 ```
 
-
 ```{r, fig.width=4, fig.height=3}
 
 plot_hazard_curve <- function(curve) {
@@ -278,16 +373,16 @@ plot_hazard_curve <- function(curve) {
 plot_hazard_curve(hazard_curve)
 ```
 
-### Rossi dataset
+### Veterans dataset
 
-Now, let's apply our knowledge and functions to our Rossi dataset.
+Now, let's apply our knowledge and functions to our Veterans dataset.
 
 ```{r echo=T, results='hide'}
 
-dat <- dat[order(dat$week),]
-rossi_hazard_curve <- hazard_rate_curve(dat$week, dat$arrest, 7)
+dat <- dat[order(dat$time),]
+veterans_hazard_curve <- hazard_rate_curve(dat$time, dat$status, 11)
 
-plot_hazard_curve(rossi_hazard_curve)
+plot_hazard_curve(veterans_hazard_curve)
 ```
 
 What can we conclude?

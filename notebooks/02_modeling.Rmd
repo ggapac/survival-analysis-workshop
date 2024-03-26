@@ -64,15 +64,21 @@ LAMBDA <- 1.0
 plot_survival_curve(LAMBDA)
 ```
 
-### Manual fitting to the Rossi dataset
+### Manual fitting to the Veterans dataset
 
 ```{r fig.width=6, fig.heigth=5}
 
 library(survival)
 library(survminer)
 
-library(carData)
-dat <- Rossi
+dat <- veteran
+summary(veteran)
+
+dat$trt <- dat$trt - 1
+treatment <- factor(dat$trt, levels=c(0,1), labels=c("standard", "test"))
+dat$prior <- dat$prior / 10
+prior <- factor(dat$prior, levels=c(0,1), labels=c("no", "yes"))
+status <- factor(dat$status, levels=c(0, 1), labels = c("censored", "death"))
 
 # Assume 'dat' is your dataset with 'week' and 'arrest' columns
 # dat <- your_data
@@ -84,11 +90,11 @@ plot_survival_comparison <- function(dat, lambda) {
   }
 
   # Fit Kaplan-Meier curve for your data
-  surv_obj <- with(dat, Surv(week, arrest))
+  surv_obj <- with(dat, Surv(time, status))
   km_fit <- survfit(surv_obj ~ 1)
 
   # Create a sequence of time points for the theoretical curve
-  time_points <- seq(0, max(dat$week), by = 0.1)
+  time_points <- seq(0, max(dat$time), by = 0.1)
   
   # Calculate theoretical survival probabilities
   survival_probabilities <- exp(-lambda * time_points)
@@ -147,8 +153,8 @@ The MLE estimate for the hazard is:
 \]
 
 ```{r}
-d <- sum(dat$arrest)
-cum_time <- sum(dat$week)
+d <- sum(dat$status)
+cum_time <- sum(dat$time)
 
 print(paste('MLE Lambda estimate is: ', d/cum_time))
 ```
@@ -171,22 +177,21 @@ Note that a lower mean ($\mu = \frac{1}{\lambda}$) relates to a higher hazard ra
 
 Example from previous chapter:
 ```{r fig.width=6, fig.height=5}
-surv_obj <- Surv(time = dat$week, event = dat$arrest)
+surv_obj <- Surv(time = dat$time, event = dat$status)
 
 # Fit Kaplan-Meier survival curve using 'fin' as the group
-km_fit <- survfit(surv_obj ~ fin, data = dat)
+km_fit <- survfit(surv_obj ~ treatment, data = dat)
 
 # Plot the Kaplan-Meier curves
 ggsurvplot(km_fit, data = dat, conf.int = TRUE, 
            ggtheme = theme_minimal(), 
            title = "Kaplan-Meier Curves",
            #palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "fin",
-           ylim = c(0.5, 1))
+           legend.title = "fin")
 ```
 
 ```{r}
-survreg(surv_obj ~ fin, dist = "exp", data=dat)
+survreg(surv_obj ~ treatment, dist = "exp", data=dat)
 ```
 
 ## Other parameteric survival models
@@ -242,8 +247,14 @@ Try to fit to the Rossi dataset:
 library(survival)
 library(survminer)
 
-library(carData)
-dat <- Rossi
+dat <- veteran
+summary(veteran)
+
+dat$trt <- dat$trt - 1
+treatment <- factor(dat$trt, levels=c(0,1), labels=c("standard", "test"))
+dat$prior <- dat$prior / 10
+prior <- factor(dat$prior, levels=c(0,1), labels=c("no", "yes"))
+status <- factor(dat$status, levels=c(0, 1), labels = c("censored", "death"))
 
 # Assume 'dat' is your dataset with 'week' and 'arrest' columns
 # dat <- your_data
@@ -258,11 +269,11 @@ plot_weibull_comparison <- function(dat, lambda, k) {
   }
 
   # Fit Kaplan-Meier curve for your data
-  surv_obj <- with(dat, Surv(week, arrest))
+  surv_obj <- with(dat, Surv(time, status))
   km_fit <- survfit(surv_obj ~ 1)
 
   # Create a sequence of time points for the theoretical curve
-  time_points <- seq(0, max(dat$week), by = 0.1)
+  time_points <- seq(0, max(dat$time), by = 0.1)
   
   # Calculate theoretical survival probabilities
   survival_probabilities <- exp(-(lambda * time_points)**k)
@@ -295,7 +306,7 @@ plot_weibull_comparison(dat, LAMBDA, K)
 ```
 
 ```{r}
-surv_obj <- with(dat, Surv(week, arrest))
+surv_obj <- with(dat, Surv(time, status))
 weibull_model <- survreg(surv_obj ~ 1, data = dat, dist = "weibull")
 
 # Extract estimated parameters
@@ -307,8 +318,8 @@ print(paste("Estimated k:", k_hat))
 ```
 Lets model the data:
 ```{r}
-survreg(surv_obj ~ fin, dist = "exp", data=dat)
-survreg(surv_obj ~ fin, dist = "weibull", data=dat)
+survreg(surv_obj ~ treatment, dist = "exp", data=dat)
+survreg(surv_obj ~ treatment, dist = "weibull", data=dat)
 ```
 ### Log-Normal Model
 
@@ -429,7 +440,7 @@ ggsurvplot(fit, data = toy_data, conf.int = TRUE,
 ### CoxPH on Rossi dataset
 
 ```{r}
-cox_model <- coxph(Surv(dat$week, dat$arrest) ~ fin + mar + paro, data = dat)
+cox_model <- coxph(Surv(dat$time, dat$status) ~ treatment + prior, data = dat)
 
 summary(cox_model)
 ```
