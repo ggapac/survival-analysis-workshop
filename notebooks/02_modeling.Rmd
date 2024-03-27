@@ -1,5 +1,5 @@
 ---
-title: "Survival analysis"
+title: "Statistical Models in Survival Analysis"
 output:
   html_document:
     df_print: paged
@@ -7,25 +7,19 @@ output:
 
 # Statistical Models in Survival Analysis
 
-Although survival curves are nice to observe and medians are important, they are hard to model mathematically.
-It is much easier to model hazard rate $h(t)$ with some nice properties.
+Although survival curves are nice to observe and medians are important, they are hard to model mathematically. It is much easier to model hazard rate $h(t)$ with some nice properties.
 
 Let's take a look at the most simple hazard rate: a constant hazard.
 
 ## Exponential model
 
-A constant hazard rate:
-\[h(t) = \lambda\]
+A constant hazard rate: $$h(t) = \lambda$$
 
-Cumulative hazard:
-\[ H(t) = \int_0^t h(s) ds = \int_0^t \lambda ds = \lambda t \]
+Cumulative hazard: $$ H(t) = \int_0^t h(s) ds = \int_0^t \lambda ds = \lambda t $$
 
-Exponential survival function:
-\[ S(t) = e^{-H(t)} = e^{-\lambda t} \]
+Exponential survival function: $$ S(t) = e^{-H(t)} = e^{-\lambda t} $$
 
-Exponential probability density function:
-\[ f(t) = -\frac{d}{dt}S(t) = \lambda e^{-\lambda t} \]
-
+Exponential probability density function: $$ f(t) = -\frac{d}{dt}S(t) = \lambda e^{-\lambda t} $$
 
 Note that the mean of the exponential distribution: $\mu = 1/\lambda$
 
@@ -131,16 +125,15 @@ The likelihood considers observed and censored events differently! If not, the l
 
 General likelihood for parametric models:
 
-\[
+$$
 L(\lambda) = \prod_{i=1}^{d} f(t_i) \prod_{j=1}^{n-d} S(t_j)
-\]
+$$
 
 where $f(t_i)$ is probability density function for the observed events (d) and $S(t_j)$ is the survival function for the unobserved events.
 
-Concretely, for the exponential model, the likelihood looks like this:
-\[
+Concretely, for the exponential model, the likelihood looks like this: $$
 L(\lambda) = \prod_{i=1}^{d} (\lambda e^{-\lambda t_i}) \prod_{j=1}^{n-d} e^{-\lambda t_j}
-\]
+$$
 
 Likelihood can be used in the maximum likelihood estimation algorithms or calculated analytically.
 
@@ -148,9 +141,9 @@ Likelihood can be used in the maximum likelihood estimation algorithms or calcul
 
 The MLE estimate for the hazard is:
 
-\[
+$$
     \hat{\lambda} = \frac{d}{\sum_i^n t_i}
-\]
+$$
 
 ```{r}
 d <- sum(dat$status)
@@ -158,24 +151,25 @@ cum_time <- sum(dat$time)
 
 print(paste('MLE Lambda estimate is: ', d/cum_time))
 ```
+
 ### Linear predictor of the hazard rate
 
 We have seen on the examples above that lambda should be positive and behaves rather logarithmically.
 
 Thus, when we model the mean in the presence of covariates, we construct the following linear predictor:
 
-\[
+$$
     \mu = \exp(\alpha + \beta_1 x_1 + ... + \beta_n x_n)    
-\]
-or equivalently:
+$$ or equivalently:
 
-\[
+$$
     log(\mu) = \alpha + \beta_1 x_1 + ... + \beta_n x_n
-\]
+$$
 
 Note that a lower mean ($\mu = \frac{1}{\lambda}$) relates to a higher hazard rate ($\lambda$) and thus poor survival.
 
 Example from previous chapter:
+
 ```{r fig.width=6, fig.height=5}
 surv_obj <- Surv(time = dat$time, event = dat$status)
 
@@ -200,9 +194,7 @@ survreg(surv_obj ~ treatment, dist = "exp", data=dat)
 
 **Description**: The Weibull model is notable for its flexibility in modeling various shapes of hazard functions — it can represent increasing, decreasing, or constant hazard rates. This versatility makes it an extension of the exponential model with an added parameter to adjust the hazard function's shape.
 
-**Function**: 
-\[ S(t) = \exp(-(\lambda t)^k) \]
-Here, \( \lambda \) (scale parameter) affects the spread of the distribution, and \( k \) (shape parameter) determines the nature of the hazard function. When \( k > 1 \), the hazard increases over time; \( k < 1 \) indicates a decreasing hazard; and \( k = 1 \) simplifies the model to an exponential one with a constant hazard.
+**Function**: $$ S(t) = \exp(-(\lambda t)^k) $$ Here, $\lambda$ (scale parameter) affects the spread of the distribution, and $k$ (shape parameter) determines the nature of the hazard function. When $k > 1$, the hazard increases over time; $k < 1$ indicates a decreasing hazard; and $k = 1$ simplifies the model to an exponential one with a constant hazard.
 
 **Use Cases**: Due to its flexibility, the Weibull model is widely used in reliability analysis and biomedical studies. It is particularly useful when the rate of occurrence of the event of interest is not constant over time.
 
@@ -241,7 +233,8 @@ K = 2
 plot_weibull_curve(LAMBDA, K)
 ```
 
-Try to fit to the Rossi dataset:
+Try to fit to the veterans dataset:
+
 ```{r fig.width=6, fig.heigth=5}
 
 library(survival)
@@ -316,17 +309,19 @@ lambda_hat <- 1/exp(coef(weibull_model)[1])
 print(paste("Estimated lambda:", lambda_hat))
 print(paste("Estimated k:", k_hat))
 ```
+
 Lets model the data:
+
 ```{r}
 survreg(surv_obj ~ treatment, dist = "exp", data=dat)
 survreg(surv_obj ~ treatment, dist = "weibull", data=dat)
 ```
+
 ### Log-Normal Model
 
 **Description**: The log-normal model posits that the logarithm of survival times follows a normal distribution. This assumption results in a skewed survival distribution, making the model appropriate for data where survival times tend to cluster around a particular time point but can extend much longer.
 
-**Function**: 
-The survival function for the log-normal model is derived from the normal distribution's cumulative distribution function (CDF) and involves more complex calculations compared to simpler models.
+**Function**: The survival function for the log-normal model is derived from the normal distribution's cumulative distribution function (CDF) and involves more complex calculations compared to simpler models.
 
 **Parameters Meaning**: The parameters in the log-normal model relate to the mean and variance of the logarithm of survival times.
 
@@ -336,12 +331,9 @@ The survival function for the log-normal model is derived from the normal distri
 
 **Description**: In the log-logistic model, the logarithm of survival times is assumed to follow a logistic distribution. Unlike the exponential and Weibull models, the log-logistic can model hazard functions that initially increase and then decrease, representing a "bathtub curve" in hazard rates.
 
-**Function**: 
-\[ S(t) = \frac{1}{1 + (\lambda t)^k} \]
-The scale parameter \( \lambda \) and shape parameter \( k \) together determine the distribution of survival times. The shape parameter \( k \) is crucial as it dictates whether the hazard rate increases, decreases, or remains constant.
+**Function**: $$ S(t) = \frac{1}{1 + (\lambda t)^k} $$ The scale parameter $\lambda$ and shape parameter $k$ together determine the distribution of survival times. The shape parameter $k$ is crucial as it dictates whether the hazard rate increases, decreases, or remains constant.
 
 **Use Cases**: This model is often used when the data suggest an initial increase in risk, followed by a decline, such as in certain chronic diseases where the risk of complications might peak at a certain time after diagnosis before declining.
-
 
 ## Cox Proportional Hazard model
 
@@ -349,56 +341,49 @@ The scale parameter \( \lambda \) and shape parameter \( k \) together determine
 
 The Cox proportional hazards model is a widely used semi-parametric method in survival analysis. This model does not require the specification of the baseline hazard function, making it flexible for a variety of survival data.
 
-**Model Specification**:
-The Cox model specifies the hazard function for an individual with covariates \(X_i\) as:
+**Model Specification**: The Cox model specifies the hazard function for an individual with covariates $X_i$ as:
 
-\[ h(t, X_i) = h_0(t) \exp(X_i \beta) \]
+$$ h(t, X_i) = h_0(t) \exp(X_i \beta) $$
 
 Here:
 
-- \( h(t, X_i) \) is the hazard function at time \( t \) for an individual with covariate vector \( X_i \).
+-   $h(t, X_i)$ is the hazard function at time $t$ for an individual with covariate vector $X_i$.
 
-- \( h_0(t) \) is the baseline hazard function, representing the hazard for an individual with all covariate values equal to zero.
+-   $h_0(t)$ is the baseline hazard function, representing the hazard for an individual with all covariate values equal to zero.
 
-- \( X_i \) is the covariate vector for the individual.
+-   $X_i$ is the covariate vector for the individual.
 
-- \( \beta \) is the vector of coefficients, quantifying the impact of each covariate.
+-   $\beta$ is the vector of coefficients, quantifying the impact of each covariate.
 
-**Proportional Hazards Assumption**:
-A key assumption of the Cox model is that the hazard ratios between individuals are constant over time, meaning that the effect of a covariate is multiplicative with respect to the hazard and does not change with time.
+**Proportional Hazards Assumption**: A key assumption of the Cox model is that the hazard ratios between individuals are constant over time, meaning that the effect of a covariate is multiplicative with respect to the hazard and does not change with time.
 
-**Hazard Ratio**:
-For any two individuals with covariate vectors \( X_1 \) and \( X_2 \), the hazard ratio is given by:
+**Hazard Ratio**: For any two individuals with covariate vectors $X_1$ and $X_2$, the hazard ratio is given by:
 
-\[ \frac{h(t, X_1)}{h(t, X_2)} = \frac{h_0(t)\exp(X_1 \beta)}{h_0(t)\exp(X_2 \beta)} = \exp[(X_1 - X_2) \beta] \]
+$$ \frac{h(t, X_1)}{h(t, X_2)} = \frac{h_0(t)\exp(X_1 \beta)}{h_0(t)\exp(X_2 \beta)} = \exp[(X_1 - X_2) \beta] $$
 
-**Survival Function**:
-The survival function can be expressed as:
+**Survival Function**: The survival function can be expressed as:
 
-\[ S(t) = \exp(-H_0(t)\exp(X \beta)) = S_0(t)\exp(X \beta) \]
+$$ S(t) = \exp(-H_0(t)\exp(X \beta)) = S_0(t)\exp(X \beta) $$
 
-where \( H_0(t) \) is the cumulative baseline hazard function, and \( S_0(t) = \exp(-H_0(t)) \) represents the baseline survival function.
+where $H_0(t)$ is the cumulative baseline hazard function, and $S_0(t) = \exp(-H_0(t))$ represents the baseline survival function.
 
-**Estimation of Baseline Hazard**:
-Breslow's estimator is commonly used for estimating \( H_0(t) \). It is given by:
+**Estimation of Baseline Hazard**: Breslow's estimator is commonly used for estimating $H_0(t)$. It is given by:
 
-\[ \hat{H}_0(t) = \sum_{t_i \leq t} \hat{h}_0(t_i) \]
+$$ \hat{H}_0(t) = \sum_{t_i \leq t} \hat{h}_0(t_i) $$
 
-where \( \hat{h}_0(t_i) = \frac{1}{\sum_{j \in R_i} \exp(X_j \beta)} \) if \( t_i \) is an event time, otherwise \( \hat{h}_0(t_i) = 0 \). Here, \( R_i \) represents the set of subjects at risk at time \( t_i \).
+where $\hat{h}_0(t_i) = \frac{1}{\sum_{j \in R_i} \exp(X_j \beta)}$ if $t_i$ is an event time, otherwise $\hat{h}_0(t_i) = 0$. Here, $R_i$ represents the set of subjects at risk at time $t_i$.
 
-**Partial Likelihood**:
-Since the baseline hazard function \( h_0(t) \) is unspecified, the Cox model uses a partial likelihood approach for parameter estimation, focusing on the coefficients \( \beta \) while treating \( h_0(t) \) as a nuisance function. The partial likelihood is defined as:
+**Partial Likelihood**: Since the baseline hazard function $h_0(t)$ is unspecified, the Cox model uses a partial likelihood approach for parameter estimation, focusing on the coefficients $\beta$ while treating $h_0(t)$ as a nuisance function. The partial likelihood is defined as:
 
-\[ L(\beta) = \prod_{j=1}^{N} \left( \frac{\exp(X_j \beta)}{\sum_{i \in R_j} \exp(X_i \beta)} \right)^{\delta_j} \]
+$$ L(\beta) = \prod_{j=1}^{N} \left( \frac{\exp(X_j \beta)}{\sum_{i \in R_j} \exp(X_i \beta)} \right)^{\delta_j} $$
 
-where \( \delta_j \) is the event indicator (1 if the event occurred, 0 otherwise).
+where $\delta_j$ is the event indicator (1 if the event occurred, 0 otherwise).
 
-**Negative Log-Partial Likelihood**:
-For computational efficiency, the negative log-partial likelihood is often minimized:
+**Negative Log-Partial Likelihood**: For computational efficiency, the negative log-partial likelihood is often minimized:
 
-\[ LL(\beta) = -\sum_{j=1}^{N} \delta_j \left[ X_j \beta - \log\left( \sum_{i \in R_j} \exp(X_i \beta) \right) \right] \]
+$$ LL(\beta) = -\sum_{j=1}^{N} \delta_j \left[ X_j \beta - \log\left( \sum_{i \in R_j} \exp(X_i \beta) \right) \right] $$
 
-The coefficients \( \beta \) are estimated by maximizing this partial likelihood. The model typically employs numerical optimization methods, like the Newton-Raphson method, for this task.
+The coefficients $\beta$ are estimated by maximizing this partial likelihood. The model typically employs numerical optimization methods, like the Newton-Raphson method, for this task.
 
 ### Modeling R
 
@@ -458,4 +443,34 @@ ggsurvplot(fit_mar, data = dat, conf.int = TRUE,
            #palette = c("#00AFBB", "#FC4E07"),
            title = "Survival Curves by Celltype",
            legend.title = "Cell type")
+```
+
+## ML-inspired approaches
+
+As computational power got cheaper and easier to access there has also been a shift towards machine learning methods in the field of survival analysis. Nowadays many ML models have their survival counterpart.
+
+Using [support vector machines for survival analysis](https://journal.r-project.org/archive/2018/RJ-2018-005/RJ-2018-005.pdf), our aim is to maximize the concordance index for comparable pairs. This results in a ranking approach that is useful when we are interested in defining risk groups, not predicting the survival. In the area of deep learning a Cox proportional hazards deep neural network called [DeepSurv](https://bmcmedresmethodol.biomedcentral.com/articles/10.1186/s12874-018-0482-1) received a lot of attention. DeepSurv is a feed-forward neural network that uses negative log partial likelihood for the objective function and predicts the effects of patient’s covariates on their hazard rate.
+
+Compared to the classical statistical models, ML-inspired models come with **less restrictive assumptions**, which makes them more appealing to practitioners. In this notebook we present one of the most commonly used ML survival models, random survival forests.
+
+### Random Survival Forests
+
+[Random survival forests](https://arxiv.org/pdf/0811.1645.pdf) consist of survival trees, which are based on the classification and regression tree (CART) algorithm. A survival tree is a simple binary tree grown by recursive splitting of tree nodes based on a criterion that maximizes the survival difference between child nodes.
+
+We briefly summarise the RSF algorithm:
+
+1.  Draw *B* bootstrap samples from the original data.
+2.  Recursively grow a survival tree for each bootstrap sample until a stopping criterion is met. At each node randomly select *p* variables and split the data according to the chosen survival criterion.
+3.  Calculate the cumulative hazard function *H(t)* for each tree and average over all of them to obtain the ensemble *H(t)* of the forest.
+
+The cumulative hazard is calculated with the Nelson–Aalen estimator: $H(t) = \sum_{t_i \leq t} \frac{d_i}{n_i}$, where $d_i$ is the number of events at time point $t_i$ and $n_i$ is the number of individuals at risk at $t_i$. The stopping criterion is usually the minimal number of events in each node, while the popular choice for the node splitting criterion is the log-rank splitting rule.
+
+```{r rfsrc}
+library("randomForestSRC")
+fit_rfsrc <- rfsrc(Surv(time, status)~., dat, importance=TRUE)
+print(fit_rfsrc)
+```
+
+```{r rfsrc_analysis}
+plot(fit_rfsrc)
 ```

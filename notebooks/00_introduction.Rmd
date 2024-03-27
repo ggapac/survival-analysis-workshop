@@ -1,5 +1,5 @@
 ---
-title: "Survival analysis"
+title: "Introduction"
 output:
   html_document:
     df_print: paged
@@ -7,9 +7,29 @@ output:
 
 # Introduction
 
-TO DO: Describe different namings, definition, examples
+**Survival analysis** is a branch of statistics for analyzing the expected duration of time until one event occurs. Even though the original name suggests this field is mainly connected to life sciences, this is not the case.
 
-It is also known as *lifetime data analysis*, *reliability analysis*, *time to event analysis*, and *event history analysis* depending on the type of application.
+Let's take a look at some real-world application domains where survival analysis can be utilized:
+
+-   predicting device failure
+
+-   modelling marriage length,
+
+-   churn prediction,
+
+-   predicting kidney failure,
+
+-   analyzing student dropout rates,
+
+-   etc.
+
+Depending on the type of application therefore the field is also known as *lifetime data analysis*, *reliability analysis*, *time to event analysis*, and *event history analysis*.
+
+To determine failure time precisely, there are three requirements:
+
+1.  a time origin must be unambiguously defined,
+2.  a scale for measuring the passage of time must be agreed,
+3.  the meaning of failure must be entirely clear.
 
 ## Fundamental concepts
 
@@ -205,7 +225,7 @@ write.csv(dat, "../data/veteran_preprocessed.csv")
 
 **Q: What type of censored data are we dealing with?**
 
-In this workshop, we focus on the Type I censoring design, our data is right-censored and we assume non-informative censoring, which means that the distribution of survival times provides no information about the distribution of censorship times and vice versa.
+In this workshop, we focus on the **Type I censoring design**, our data is **right-censored** and we assume **non-informative censoring**, which means that the distribution of survival times provides no information about the distribution of censorship times and vice versa.
 
 There are better ways to explore survival data. Let's see how.
 
@@ -222,7 +242,6 @@ More intitive: *The survival function indicates the proportion of a population e
 ![](images/example-survival-curve.png)
 
 -   **Median survival time**: Median survival time is the time at which 50% of the population has experienced the event of interest.
-
 
 ## Kaplan-Meier curves
 
@@ -243,9 +262,9 @@ Let's first familiarize ourselves with Kaplan-Meier curves on a toy example.
 
 Kaplan-Meier estimator follows the equation:
 
-\[
+$$
   \widehat{S}(t) = \prod_{i: t_i \leq t} \left(1 - \frac{d_i}{n_i}\right),
-\]
+$$
 
 where $\widehat{S}(0) = 1$.
 

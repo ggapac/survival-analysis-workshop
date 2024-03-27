@@ -8,13 +8,15 @@ output:
 # Survival Analysis: Predictive Modelling
 
 ```{r}
-require("randomForestSRC")
-require("coxph")
-require("survival")
+library("randomForestSRC")
+library("survival")
+source("../src/util.R")
 
 dat <- read.csv("../data/veteran_preprocessed.csv")
 dat$celltype <- as.factor(dat$celltype)
 ```
+
+Survival models prove to be a useful tool in many practical scenarios. Doctors can use their estimates to inform the patient about the likely outcomes of their disease or to make informed decisions about the patient’s therapy, the models can help scientists design randomized clinical studies, and the prediction estimates can assist the authorities with healthcare planning and resource distribution. It is therefore of great importance to pay special attention to model evaluation, which, as we present in this notebook, is in this case not so trivial due to the distinguishing feature of survival data – censoring.
 
 ## Measures of prediction error
 
@@ -29,6 +31,7 @@ First we preprocess the dataset: we standardize numeric variables to avoid conve
 set.seed(8)
 
 train_size <- 0.7
+dat$id <- 1:nrow(dat)
 train_ix <- sample(1:nrow(dat), round(train_size * nrow(dat)))
 train_dat <- dat[train_ix,]
 test_dat <- dat[-train_ix,]
@@ -75,8 +78,6 @@ features <- c("age",
               "celltypesquamous")
 
 models <- c("cox", "exp", "weibull", "rfsrc")
-times_of_interest <- seq(1, 284, 7)
-#quantile(dat$time, probs=seq(0, 1, 0.05))
 ```
 
 ```{r f_fit_predict}
@@ -142,6 +143,8 @@ Harrell's C-index received a lot of criticism, and even the author himself state
 ```{r c_index}
 
 is_concordant <- function(i, j, tmp_time, unique_times, surv_probs) {
+    # A pair of individuals is concordant t_i > t_j and i has lower surv. probability.
+    
     time_ix <- which(unique_times == tmp_time)
     if (surv_probs[time_ix, i] < surv_probs[time_ix, j]) {
         return(TRUE)
@@ -150,6 +153,7 @@ is_concordant <- function(i, j, tmp_time, unique_times, surv_probs) {
 }
 
 my_c_index <- function(test_dat, surv_probs) {
+    
     conc_pairs <- 0
     disc_pairs <- 0
     unique_times <- unique(sort(test_dat$time))
@@ -188,13 +192,14 @@ my_c_index <- function(test_dat, surv_probs) {
     conc_pairs / (conc_pairs + disc_pairs)
 }
 
-c_indexes <- NULL # TODO: uncertainty!
+c_indexes <- NULL
 for (modl in names(model_predictions)) {
     tmp_c_ix <- my_c_index(test_dat, model_predictions[[modl]])
     c_indexes <- rbind(c_indexes,
                        data.frame("model" = modl,
                                   "c_index" = tmp_c_ix))
 }
+c_indexes
 ```
 
 ### Model evaluation at time point t: IPCW Brier Score
@@ -211,7 +216,7 @@ $$
 
 Brier score ranges from 0 to 1 and even though it is called a score, our aim is to minimize it.
 
-However, if an individual is censored, it is not possible to evaluate the loss function for their predicted probability since their actual status is unknown. It turns out that instead of ignoring them, we can still use their data in our model evaluation indirectly by applying inverse probability weighting for censoring (IPCW).
+However, if an individual is censored, it is not possible to evaluate the loss function for their predicted probability since their actual status is unknown. It turns out that instead of ignoring them, we can still use their data in our model evaluation indirectly by applying **inverse probability weighting for censoring** (IPCW).
 
 Let $\tau_i$ be the event time for individual $i$. Their inverse probability of censoring weight is defined as
 
@@ -231,6 +236,7 @@ $$
 
 ```{r ipcw_brier}
 get_individual_ipcw_weights <- function(test_dat, weights, tp) {
+    # Get weights for each individual.
     
     w_i <- rep(NA, nrow(test_dat))
     
@@ -241,57 +247,34 @@ get_individual_ipcw_weights <- function(test_dat, weights, tp) {
             w_i[i] <- 0
         } else {
             w_denom <- weights$w[weights$id == test_dat$id[i]]
-
             w_i[i] <- 1 / w_denom
         }
     }
     w_i
 }
 
-get_censoring_probs <- function(train_dat, test_dat, 
-                                covariates, tp, c_method="marginal") {
-
-
+get_censoring_probs <- function(train_dat, test_dat, tp) {
+    # Use Kaplan-Meier to model the censoring distribution. 
+    
     train_dat <- train_dat[order(train_dat$time), ]
     test_dat <- test_dat[order(test_dat$time, -test_dat$status), ]
-
-    # We have to change the outcome at the limit cause technically it is not
-    # censored, we now that the event hasnt happened at that time point
-    tmp_train <- train_dat
-    tmp_train$status[tmp_train$time == tp] <- 1 
     
     cens_probs_df <- NULL
-    if (c_method == "marginal") {
-        form <- as.formula(paste0("Surv(time, 1-status)~1"))
-        cens_fit <- survfit(form, dat=tmp_train)
-        tmp <- summary(cens_fit, times=test_dat$time)
+    
+    form <- as.formula(paste0("Surv(time, 1-status)~1"))
+    cens_fit <- survfit(form, dat=train_dat)
+    tmp <- summary(cens_fit, times=test_dat$time)
 
-        cens_probs_df <- data.frame("id" = test_dat$id,
-                                    "w" = tmp$surv,
-                                    "times" = test_dat$time)
-        
-    } else {
-
-        cov_pasted <- paste0(covariates, collapse = "+")
-        
-        # If no censoring, all weights are 1
-        if (sum(1 - tmp_train[[status_col]]) == 0) {
-            pred <- rep(1, nrow(test_dat))
-        } else {
-            form <- as.formula(paste0("Surv(", time_col, ", 1 - ", status_col, ") ~ ",
-                                      cov_pasted))
-            cens_fit <- coxph(form, dat=tmp_train)
-            pred <- predict(cens_fit, newdata=test_dat, times=test_dat$time, type="survival")
-        }
-        
-        cens_probs_df <- data.frame("w" = pred,
-                                    "times" = test_dat$status)
-    }
+    cens_probs_df <- data.frame("id" = test_dat$id,
+                                "w" = tmp$surv,
+                                "times" = test_dat$time)
     
     cens_probs_df
 }
 
 get_ipcwBrier <- function(y, pred, w) {
+    # Calculate IPCW Brier.
+    
     bs <- w * (pred - y)^2
     bs
 }
@@ -299,15 +282,81 @@ get_ipcwBrier <- function(y, pred, w) {
 ```
 
 ```{r}
-test_dat$id <- 1:nrow(test_dat)
-cens_probs <- get_censoring_probs(train_dat, test_dat, features, 80)
-ipcw_weights <- get_individual_ipcw_weights(test_dat, cens_probs, 80)
+times <- c(15, 30, 45, 59, 80, 118, 139, 153, 182, 201, 231, 278, 340)
 
-# TODO
-time_ix <- which(sort(unique(test_dat$time)) == 30)
-get_ipcwBrier(test_dat$status, model_predictions[["cox"]][time_ix, ], ipcw_weights)
+
+b_scores <- NULL
+for (modl in models) {
+    for (tp in times) {
+        
+        # get individual's status at time tp
+        # tmp_train dat is used when calculating the weights, tmp_test_dat for prediction
+        tmp_train_dat <- train_dat
+        tmp_train_dat <- tmp_train_dat[order(tmp_train_dat$time), ]
+        tmp_train_dat$status[tmp_train_dat$status == 1 & tmp_train_dat$time > tp] <- 0
+        tmp_test_dat <- test_dat
+        tmp_test_dat <- tmp_test_dat[order(tmp_test_dat$time), ]
+        tmp_test_dat$status[tmp_test_dat$status == 1 & tmp_test_dat$time > tp] <- 0
+        
+        # get weights
+        cens_probs <- get_censoring_probs(train_dat, tmp_test_dat, tp)
+        ipcw_weights <- get_individual_ipcw_weights(tmp_test_dat, cens_probs, tp)
+        
+        time_ix <- which(sort(unique(test_dat$time)) == tp)
+        tmp_brier <- get_ipcwBrier(tmp_test_dat$status, 
+                                   1-model_predictions[[modl]][time_ix, ], # 1 - survival probability, because status=1 indicates event happening
+                                   ipcw_weights)
+        
+        # use bootstrap to calculate uncertainty
+        boot_distr <- bootstrap(tmp_brier)
+        ci <- boot_perc_ci(boot_distr)
+        
+        b_scores <- rbind(b_scores,
+                          data.frame("model" = modl,
+                                     "t" = tp,
+                                     "brier" = mean(tmp_brier),
+                                     "ci_low" = ci[["CIlow"]],
+                                     "ci_upp" = ci[["CIupp"]]))
+    }
+}
+
 ```
 
-If we do not want to restrict ourselves to a single time point we can calculate the Integrated Brier Score (IBS), which provides an overall calculation of the model performance at all available times: $$
+```{r}
+ggplot(b_scores, aes(x=t, y=brier, color=model)) + 
+    geom_point() + 
+    geom_line() + 
+    geom_errorbar(aes(ymin = ci_low, ymax = ci_upp), width=5) +
+    ylab("IPCW Brier Score") +
+    theme_bw()
+```
+
+### Other metrics to consider
+
+There are many other metrics that we find in related work. Note that the IPCW methodology is not limited to the Brier score, it can be utilized with other metrics as well.
+
+#### Log Loss at time t
+
+Similar to Brier Score, we can also use log loss for evaluating our models at time $t$:
+
+$$
+LL(t) = - \frac{1}{N} \sum_{i=1}^{N} \big(y_i(t) \log{p_i(t)} + (1 - y_i(t))\log{(1-p_i(t))}\big).
+$$
+
+#### Integrated Brier Score
+
+If we do not want to restrict ourselves to a single time point we can calculate the Integrated Brier Score (IBS), which provides an overall calculation of the model performance at all available times:
+
+$$
     IBS(t_{max}) = \frac{1}{t_{max}} \int_{0}^{t_{max}} BS(t) dt.
     $$
+
+#### Time-dependent AUC
+
+The receiver operating characteristic (ROC) curve and the area under the ROC curve (AUC) can be extended to survival data by defining sensitivity and specificity as time-dependent measures by classifying positive and negative examples with respect to a certain time. AUC is defined as
+
+$$
+AUC(t) = \frac{\sum_{i=1}^{N}\sum_{j=1}^{N}I(\tau_i \leq t, \tau_j > t)I(p_i(t) \geq p_j(t))}{(\sum_{i=1}^{N}I(\tau_i \leq t))(\sum_{i=1}^{N} I(\tau_j > t))},
+$$
+
+where $\tau_i$ marks the event time for the $i$-th individual, and $I(\cdot)$ is the indicator function. Similar to the concordance index, AUC is a discrimination measure. While the concordance index measures how well the model can order individuals according to their survival times in general, time-dependent AUC measures how well the model can order them at time $t$.
