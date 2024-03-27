@@ -1,0 +1,313 @@
+---
+title: "Predictive Modelling"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Survival Analysis: Predictive Modelling
+
+```{r}
+require("randomForestSRC")
+require("coxph")
+require("survival")
+
+dat <- read.csv("../data/veteran_preprocessed.csv")
+dat$celltype <- as.factor(dat$celltype)
+```
+
+## Measures of prediction error
+
+Choice of a suitable measure for prediction error is application-specific. We can be interested in group- or individual-level predictions and evaluate overall performance through time or only focus on predictions at a particular time point, to name a few.
+
+Let's get back to our Veterans example and see how it works in practice.
+
+First we preprocess the dataset: we standardize numeric variables to avoid convergence issues and we apply one-hot encoding to our categorical variable `celltype`.
+
+```{r preprocessing}
+# note: make it stratified, or pick the right seed :D
+set.seed(8)
+
+train_size <- 0.7
+train_ix <- sample(1:nrow(dat), round(train_size * nrow(dat)))
+train_dat <- dat[train_ix,]
+test_dat <- dat[-train_ix,]
+
+# standardize numeric
+numeric_cols <- c("karno", "diagtime", "age")
+for (col in numeric_cols) {
+    col_mean <- mean(train_dat[[col]])
+    col_sd <- sd(train_dat[[col]])
+    
+    train_dat[[col]] <- c(scale(train_dat[[col]]))
+    test_dat[[col]] <- c(scale(test_dat[[col]],
+                               center = col_mean,
+                               scale = col_sd))
+}
+
+# dummy variables
+cell_type_dummy_train <- model.matrix(~ celltype, data = train_dat)
+train_dat$celltype <- NULL
+train_dat <- cbind(train_dat, cell_type_dummy_train[, -1])
+
+cell_type_dummy_test <- model.matrix(~ celltype, data = test_dat)
+test_dat$celltype <- NULL
+test_dat <- cbind(test_dat, cell_type_dummy_test[, -1])
+```
+
+In our experiment we test 4 different models that we mentioned today:
+
+-   Cox PH model
+-   Exponential model
+-   Weibull model
+-   Random survival forests
+
+We use all the features available in the dataset. At this point we do not bother with any feature engineering or feature selection, but it is good to have these steps in mind in our real-life use cases!
+
+```{r experiment_parameters}
+features <- c("age", 
+              "karno", 
+              "diagtime", 
+              "prior", 
+              "trt", 
+              "celltypelarge", 
+              "celltypesmallcell", 
+              "celltypesquamous")
+
+models <- c("cox", "exp", "weibull", "rfsrc")
+times_of_interest <- seq(1, 284, 7)
+#quantile(dat$time, probs=seq(0, 1, 0.05))
+```
+
+```{r f_fit_predict}
+f_fit <- function(model_type, form, train_dat) {
+    
+    if (model_type == "cox") {
+        coxph(form, data = train_dat)
+    } else if (model_type == "exp") {
+        flexsurvreg(formula=form, data=train_dat, dist="exp")
+    } else if (model_type == "weibull") {
+        flexsurvreg(formula=form, data=train_dat, dist="weibull")
+    } else if (model_type == "rfsrc") {
+        rfsrc.fast(formula=form, data=train_dat, forest=TRUE)
+    }
+}
+
+f_predict <- function(model_type, model, test_dat) {
+    if (model_type == "cox") {
+        pred <- survfit(model, newdata=test_dat)
+        pred_summary <- summary(pred, times=unique(test_dat$time))
+        surv_probs <- pred_summary$surv
+    } else if (model_type == "exp" || model_type == "weibull") {
+        pred <- predict(model, 
+                        newdata=test_dat, 
+                        times=unique(test_dat$time), 
+                        type="survival")
+        surv_probs <- NULL
+        for (i in 1:nrow(pred)) {
+            surv_probs <- cbind(surv_probs, pred[i, ]$.pred[[1]]$.pred_survival)
+        }
+        times <- pred[1, ]$.pred[[1]]$.time
+        surv_probs <- surv_probs[order(times), ]
+    } else if (model_type == "rfsrc") {
+        pred <- predictSurvProb(fitted, newdata=test_dat, times=unique(sort(test_dat$time)))
+        t(pred)
+    }
+}
+```
+
+```{r modelling}
+form = as.formula(paste0("Surv(time,status)~", paste0(features, collapse="+")))
+
+fitted_models <- list()
+model_predictions <- list()
+for (modl in models) {
+    fitted_models[[modl]] <- f_fit(modl, form, train_dat)
+    model_predictions[[modl]] <- f_predict(modl, fitted_models[[modl]], test_dat)
+}
+```
+
+### Concordance index
+
+Concordance index, also commonly known as the C-statistic or C-index, is a time-independent metric that provides an overall assessment of the model discrimination power. It measures how well the model can separate the individuals and is essentially a ranking measure, since the exact values are not important, it only focuses on the relative ordering. The most common concordance index is also referred to as *Harrell's C-index*, named after the author. It is defined as
+
+$$
+C = \frac{\sum_{i,j}I(\tau_i > \tau_j)I(i\text{ has better predictive outcome})\delta_j}{\sum_{i,j}I(\tau_i > \tau_j)\delta_j},
+$$
+
+where we consider all comparable pairs of individuals. A pair is considered comparable if the individual with a shorter survival time $\tau_j$ is not censored ($\delta_j \neq 0$). In the numerator we count 1 if our model gave the individual with the longer survival time better predictive outcome (this can be for example lower risk score, higher survival probability, longer survival time). Note that $C=0.5$ indicates no predictive discrimination and $C=1$ means perfect separation.
+
+Harrell's C-index received a lot of criticism, and even the author himself states that it is not a suitable measure for detecting small differences when we want to compare different models.
+
+```{r c_index}
+
+is_concordant <- function(i, j, tmp_time, unique_times, surv_probs) {
+    time_ix <- which(unique_times == tmp_time)
+    if (surv_probs[time_ix, i] < surv_probs[time_ix, j]) {
+        return(TRUE)
+    }
+    return(FALSE)
+}
+
+my_c_index <- function(test_dat, surv_probs) {
+    conc_pairs <- 0
+    disc_pairs <- 0
+    unique_times <- unique(sort(test_dat$time))
+    
+    for (i in 1:nrow(test_dat)) {
+        for (j in 1:nrow(test_dat)) {
+            # skip if:
+            #    - same patient
+            #    - both censored
+            #    - one censored but censoring happened before the event
+            if ((i == j) || 
+                (test_dat$status[i] == 0 && test_dat$status[j] == 0) ||
+                (test_dat$status[i] == 0 &&
+                 test_dat$status[j] == 1 && 
+                 test_dat$time[i] < test_dat$time[j]) ||
+                (test_dat$status[i] == 1 &&
+                 test_dat$status[j] == 0 && 
+                 test_dat$time[j] < test_dat$time[i])) next
+            
+            # when both experience the event or one censored but censoring
+            # happened after the event
+            conc <- NULL
+            if (test_dat$time[i] < test_dat$time[j]) {
+                conc <- is_concordant(i, 
+                                      j, 
+                                      test_dat$time[i],
+                                      unique_times,
+                                      surv_probs)
+                
+                conc_pairs <- conc_pairs + conc
+                disc_pairs <- disc_pairs + !conc
+            }
+        }
+    }
+    
+    conc_pairs / (conc_pairs + disc_pairs)
+}
+
+c_indexes <- NULL # TODO: uncertainty!
+for (modl in names(model_predictions)) {
+    tmp_c_ix <- my_c_index(test_dat, model_predictions[[modl]])
+    c_indexes <- rbind(c_indexes,
+                       data.frame("model" = modl,
+                                  "c_index" = tmp_c_ix))
+}
+```
+
+### Model evaluation at time point t: IPCW Brier Score
+
+A common scenario is to predict survival status at a pre-defined time point $t$, i.e. if the individual experienced the event by $t$ or if they are still event-free. Probabilistic predictions are evaluated with scoring rules, such as Brier score, log loss etc. In this example we focus on Brier score.
+
+Let $N$ be the number of individuals and let $t$ be the time point of interest, where $y_i(t)$ represents the event status and $p_i(t)$ is the predicted survival probability at time $t$.
+
+Brier score can be thought of as the mean squared error of our prediction. In the absence of censoring we can define Brier score for the $i$-th individual at time point $t$ in the following form:
+
+$$
+BS(t) = \frac{1}{N} \sum_{i=1}^{N} (y_i(t) - p_i(t))^2.
+$$
+
+Brier score ranges from 0 to 1 and even though it is called a score, our aim is to minimize it.
+
+However, if an individual is censored, it is not possible to evaluate the loss function for their predicted probability since their actual status is unknown. It turns out that instead of ignoring them, we can still use their data in our model evaluation indirectly by applying inverse probability weighting for censoring (IPCW).
+
+Let $\tau_i$ be the event time for individual $i$. Their inverse probability of censoring weight is defined as
+
+$$
+w_i = \begin{cases}
+1/G(t|\mathbf{x}_i)), &\text{if $t < \tau_i$}\\
+1/G(\tau_i|\mathbf{x}_i), &\text{if $t\geq \tau_i$ and $\delta_i = 1$}\\
+0, &\text{otherwise,}
+\end{cases}
+$$
+
+where $G(c|\mathbf{x}_i) = P(C > c | \mathbf{x}_i)$ is a conditional censoring function, most often the Kaplan-Meier or Cox PH estimate of the censoring distribution. Each individual falls into one of the three categories: 1) event-free at $t$; 2) event occurred before $t$; 3) censoring occurred before $t$. By using weights $w_i$ we can make sure every individual contributes to the final score, even the ones from category 3). Because their status at time point $t$ is unknown, their weight is 0, however, their contribution is implicit, as it is considered in the censoring distribution.
+
+Now we can define the IPCW Brier score definition by taking into account the weights: $$
+BS_{IPCW}(t) = \frac{1}{N}\sum_{i=1}^{N} w_i(y_i(t) - p_i(t))^2.
+$$
+
+```{r ipcw_brier}
+get_individual_ipcw_weights <- function(test_dat, weights, tp) {
+    
+    w_i <- rep(NA, nrow(test_dat))
+    
+    for (i in 1:nrow(test_dat)) {
+        
+        # If censored before time point, the weight is 0
+        if (test_dat$time[i] < tp && test_dat$status[i] == 0) {
+            w_i[i] <- 0
+        } else {
+            w_denom <- weights$w[weights$id == test_dat$id[i]]
+
+            w_i[i] <- 1 / w_denom
+        }
+    }
+    w_i
+}
+
+get_censoring_probs <- function(train_dat, test_dat, 
+                                covariates, tp, c_method="marginal") {
+
+
+    train_dat <- train_dat[order(train_dat$time), ]
+    test_dat <- test_dat[order(test_dat$time, -test_dat$status), ]
+
+    # We have to change the outcome at the limit cause technically it is not
+    # censored, we now that the event hasnt happened at that time point
+    tmp_train <- train_dat
+    tmp_train$status[tmp_train$time == tp] <- 1 
+    
+    cens_probs_df <- NULL
+    if (c_method == "marginal") {
+        form <- as.formula(paste0("Surv(time, 1-status)~1"))
+        cens_fit <- survfit(form, dat=tmp_train)
+        tmp <- summary(cens_fit, times=test_dat$time)
+
+        cens_probs_df <- data.frame("id" = test_dat$id,
+                                    "w" = tmp$surv,
+                                    "times" = test_dat$time)
+        
+    } else {
+
+        cov_pasted <- paste0(covariates, collapse = "+")
+        
+        # If no censoring, all weights are 1
+        if (sum(1 - tmp_train[[status_col]]) == 0) {
+            pred <- rep(1, nrow(test_dat))
+        } else {
+            form <- as.formula(paste0("Surv(", time_col, ", 1 - ", status_col, ") ~ ",
+                                      cov_pasted))
+            cens_fit <- coxph(form, dat=tmp_train)
+            pred <- predict(cens_fit, newdata=test_dat, times=test_dat$time, type="survival")
+        }
+        
+        cens_probs_df <- data.frame("w" = pred,
+                                    "times" = test_dat$status)
+    }
+    
+    cens_probs_df
+}
+
+get_ipcwBrier <- function(y, pred, w) {
+    bs <- w * (pred - y)^2
+    bs
+}
+
+```
+
+```{r}
+test_dat$id <- 1:nrow(test_dat)
+cens_probs <- get_censoring_probs(train_dat, test_dat, features, 80)
+ipcw_weights <- get_individual_ipcw_weights(test_dat, cens_probs, 80)
+
+# TODO
+time_ix <- which(sort(unique(test_dat$time)) == 30)
+get_ipcwBrier(test_dat$status, model_predictions[["cox"]][time_ix, ], ipcw_weights)
+```
+
+If we do not want to restrict ourselves to a single time point we can calculate the Integrated Brier Score (IBS), which provides an overall calculation of the model performance at all available times: $$
+    IBS(t_{max}) = \frac{1}{t_{max}} \int_{0}^{t_{max}} BS(t) dt.
+    $$
