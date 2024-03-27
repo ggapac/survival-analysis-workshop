@@ -55,8 +55,6 @@ What distinguishes survival analysis from other areas in statistics is the data 
 
 Censored data is **any data for which we do not know the exact event time**.
 
-For a survival problem, the time to the event of interest ($T$) is known precisely only for those instances where the event occurs during the study period.
-
 We distinguish between Type I and Type II censoring:
 
 -   In Type I censoring we observe all individuals for a specific time period or until failure.
