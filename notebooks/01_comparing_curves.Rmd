@@ -26,13 +26,15 @@ treatment <- factor(dat$trt, levels=c(0,1), labels=c("standard", "test"))
 dat$prior <- dat$prior / 10
 prior <- factor(dat$prior, levels=c(0,1), labels=c("no", "yes"))
 status <- factor(dat$status, levels=c(0, 1), labels = c("censored", "death"))
+
+celltype_group <- factor(ifelse(dat$celltype == "smallcell", "SCLC", "NSCLC"))
 ```
 
 
 ```{r fig.width=6, fig.height=5}
 surv_obj <- Surv(time = dat$time, event = dat$status)
 
-# Fit Kaplan-Meier survival curve using 'fin' as the group
+# Fit Kaplan-Meier survival curve using 'prior' as the group
 km_fit <- survfit(surv_obj ~ prior, data = dat)
 
 # Plot the Kaplan-Meier curves
@@ -50,15 +52,15 @@ Let's compare CUMULATIVE hazard functions.
 surv_obj <- Surv(time = dat$time, event = dat$status)
 
 # Estimate cumulative hazard functions using Nelson-Aalen method
-cum_haz_fit <- survfit(surv_obj ~ treatment, data = dat, type = "fleming")
+cum_haz_fit <- survfit(surv_obj ~ prior, data = dat, type = "fleming")
 
 # Plot the cumulative hazard functions
 ggsurvplot(cum_haz_fit, data = dat, fun = "cumhaz", conf.int = TRUE,
            ggtheme = theme_minimal(), 
-           title = "Cumulative Hazard Curves by Treatment",
+           title = "Cumulative Hazard Curves by Prior",
            xlab = "Time", ylab = "Cumulative Hazard",
            palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "treatment")
+           legend.title = "prior")
 
 ```
 
@@ -88,19 +90,18 @@ print(log_rank_test)
 ```{r fig.width=6, fig.height=5}
 surv_obj <- Surv(time = dat$time, event = dat$status)
 
-# Fit Kaplan-Meier survival curve using 'fin' as the group
-km_fit <- survfit(surv_obj ~ treatment, data = dat)
+km_fit <- survfit(surv_obj ~ prior, data = dat)
 
 # Plot the Kaplan-Meier curves
 ggsurvplot(km_fit, data = dat, conf.int = TRUE, 
            ggtheme = theme_minimal(), 
-           title = "Kaplan-Meier Curves by Treatment",
+           title = "Kaplan-Meier Curves by Prior",
            palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "treatment")
+           legend.title = "prior")
 ```
 
 ```{r}
-log_rank_test <- survdiff(Surv(time, status) ~ treatment, data = dat)
+log_rank_test <- survdiff(Surv(time, status) ~ prior, data = dat)
 print(log_rank_test)
 ```
 

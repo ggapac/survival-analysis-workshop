@@ -258,7 +258,7 @@ event <- c(1, 1, 0, 1, 1, 0, 1, 0, 0, 1)
 
 KM_curve <- function(time, event) {
   df <- data.frame(time = time, event = event)
-  curve <- data.frame(time = c(0, unique(time)), proba = c(NA))
+  curve <- data.frame(time = c(0, unique(time)), proba = c(NA), censor = c(NA))
 
   S <- 1
 
@@ -270,13 +270,17 @@ KM_curve <- function(time, event) {
     n <- nrow(df[df$time >= t,])
 
     S <- S * (1 - d/n)
-    curve[i, "proba"] <- S    
+    curve[i, "proba"] <- S
+
+    cens <- sum(df[df$time == t,]$event - 1) < 0
+    curve[i, "censor"] <- cens    
   }
 
   return(curve)
 }
 
 curve <- KM_curve(time, event)
+curve
 ```
 
 Use this function to plot the curve:
@@ -285,8 +289,10 @@ Use this function to plot the curve:
 
 plot_survival_curve <- function(curve) {
   ggplot(curve, aes(x = time, y = proba)) +
-    geom_step() +
     ylim(0, 1) +
+    geom_step() +
+    geom_point(data = subset(curve, censor == TRUE), aes(x = time, y = proba),
+               color = "red", size = 2) +
     theme_minimal() +
     labs(x = "Time", y = "Probability", title = "Kaplan-Meier Survival Curve")
 }
@@ -336,9 +342,7 @@ moving_average <- function(x, n) {
 
 hazard_rate_curve <- function(time, event, filter_size) {
   df <- data.frame(time = time, event = event)
-  curve <- data.frame(time = c(0, unique(time)), rate = c(NA))
-
-  h <- 0
+  curve <- data.frame(time = c(0, unique(time)), rate = c(NA), censor = c(NA))
 
   for (i in seq_along(curve$time)) {
 
@@ -348,6 +352,9 @@ hazard_rate_curve <- function(time, event, filter_size) {
     n <- nrow(df[df$time >= t,])
 
     curve[i, "rate"] <- d/n
+
+    cens <- sum(df[df$time == t,]$event - 1) < 0
+    curve[i, "censor"] <- cens
   }
 
   ma <- moving_average(curve$rate, filter_size)
@@ -365,6 +372,8 @@ hazard_curve <- hazard_rate_curve(time, event, 3)
 
 plot_hazard_curve <- function(curve) {
   ggplot(curve, aes(x = time, y = rate)) +
+    geom_point(data = subset(curve, censor == TRUE), aes(x = time, y = rate),
+               color = "red", size = 2) +
     geom_step() +
     theme_minimal() +
     labs(x = "Time", y = "Hazard Rate", title = "Hazard Rate Curve")
