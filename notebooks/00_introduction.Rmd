@@ -221,13 +221,8 @@ More intitive: *The survival function indicates the proportion of a population e
 
 ![](images/example-survival-curve.png)
 
-### Terminology:
-
 -   **Median survival time**: Median survival time is the time at which 50% of the population has experienced the event of interest.
 
--   
-
-    ------------------------------------------------------------------------
 
 ## Kaplan-Meier curves
 
@@ -248,7 +243,9 @@ Let's first familiarize ourselves with Kaplan-Meier curves on a toy example.
 
 Kaplan-Meier estimator follows the equation:
 
-$\widehat{S}(t) = \prod_{i: t_i \leq t} \left(1 - \frac{d_i}{n_i}\right),$
+\[
+  \widehat{S}(t) = \prod_{i: t_i \leq t} \left(1 - \frac{d_i}{n_i}\right),
+\]
 
 where $\widehat{S}(0) = 1$.
 
@@ -303,16 +300,16 @@ plot_survival_curve <- function(curve) {
 plot_survival_curve(curve)
 ```
 
-### Rossi dataset
+### Veterans dataset
 
-Now, let's apply our knowledge and functions to our Rossi dataset.
+Now, let's apply our knowledge and functions to our Veterans dataset.
 
 ```{r echo=T, results='hide'}
 
-dat <- dat[order(dat$week),]
-rossi_curve <- KM_curve(dat$week, dat$arrest)
+dat <- dat[order(dat$time),]
+veterans_curve <- KM_curve(dat$time, dat$status)
 
-plot_survival_curve(rossi_curve)
+plot_survival_curve(veterans_curve)
 ```
 
 What can we conclude?
@@ -381,16 +378,16 @@ plot_hazard_curve <- function(curve) {
 plot_hazard_curve(hazard_curve)
 ```
 
-### Rossi dataset
+### Veterans dataset
 
-Now, let's apply our knowledge and functions to our Rossi dataset.
+Now, let's apply our knowledge and functions to our Veterans dataset.
 
 ```{r echo=T, results='hide'}
 
-dat <- dat[order(dat$week),]
-rossi_hazard_curve <- hazard_rate_curve(dat$week, dat$arrest, 7)
+dat <- dat[order(dat$time),]
+veterans_hazard_curve <- hazard_rate_curve(dat$time, dat$status, 11)
 
-plot_hazard_curve(rossi_hazard_curve)
+plot_hazard_curve(veterans_hazard_curve)
 ```
 
 What can we conclude?

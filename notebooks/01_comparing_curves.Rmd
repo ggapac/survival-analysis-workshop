@@ -18,42 +18,47 @@ But how about when you want to compare two groups or subgroups of the population
 library(survival)
 library(survminer)
 
-library(carData)
-dat <- Rossi
+dat <- veteran
+summary(veteran)
+
+dat$trt <- dat$trt - 1
+treatment <- factor(dat$trt, levels=c(0,1), labels=c("standard", "test"))
+dat$prior <- dat$prior / 10
+prior <- factor(dat$prior, levels=c(0,1), labels=c("no", "yes"))
+status <- factor(dat$status, levels=c(0, 1), labels = c("censored", "death"))
 ```
 
 
 ```{r fig.width=6, fig.height=5}
-surv_obj <- Surv(time = dat$week, event = dat$arrest)
+surv_obj <- Surv(time = dat$time, event = dat$status)
 
 # Fit Kaplan-Meier survival curve using 'fin' as the group
-km_fit <- survfit(surv_obj ~ paro, data = dat)
+km_fit <- survfit(surv_obj ~ prior, data = dat)
 
 # Plot the Kaplan-Meier curves
 ggsurvplot(km_fit, data = dat, conf.int = TRUE, 
            ggtheme = theme_minimal(), 
-           title = "Kaplan-Meier Curves by Parole",
+           title = "Kaplan-Meier Curves by Prior",
            palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "fin",
-           ylim = c(0.5, 1))
+           legend.title = "prior")
 ```
 
 
 Let's compare CUMULATIVE hazard functions.
 ```{r fig.width=6, fig.height=5}
 # Create a survival object
-surv_obj <- Surv(time = dat$week, event = dat$arrest)
+surv_obj <- Surv(time = dat$time, event = dat$status)
 
 # Estimate cumulative hazard functions using Nelson-Aalen method
-cum_haz_fit <- survfit(surv_obj ~ paro, data = dat, type = "fleming")
+cum_haz_fit <- survfit(surv_obj ~ treatment, data = dat, type = "fleming")
 
 # Plot the cumulative hazard functions
 ggsurvplot(cum_haz_fit, data = dat, fun = "cumhaz", conf.int = TRUE,
            ggtheme = theme_minimal(), 
-           title = "Cumulative Hazard Curves by Parole",
+           title = "Cumulative Hazard Curves by Treatment",
            xlab = "Time", ylab = "Cumulative Hazard",
            palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "fin")
+           legend.title = "treatment")
 
 ```
 
@@ -74,29 +79,28 @@ where O is the number of observations and E the expected number of observations.
 ### Log-rank in R
 
 ```{r}
-log_rank_test <- survdiff(Surv(week, arrest) ~ paro, data = dat)
+log_rank_test <- survdiff(Surv(time, status) ~ prior, data = dat)
 print(log_rank_test)
 ```
 
 ### Example
 
 ```{r fig.width=6, fig.height=5}
-surv_obj <- Surv(time = dat$week, event = dat$arrest)
+surv_obj <- Surv(time = dat$time, event = dat$status)
 
 # Fit Kaplan-Meier survival curve using 'fin' as the group
-km_fit <- survfit(surv_obj ~ wexp, data = dat)
+km_fit <- survfit(surv_obj ~ treatment, data = dat)
 
 # Plot the Kaplan-Meier curves
 ggsurvplot(km_fit, data = dat, conf.int = TRUE, 
            ggtheme = theme_minimal(), 
-           title = "Kaplan-Meier Curves by fin",
+           title = "Kaplan-Meier Curves by Treatment",
            palette = c("#00AFBB", "#FC4E07"),
-           legend.title = "fin",
-           ylim = c(0.5, 1))
+           legend.title = "treatment")
 ```
 
 ```{r}
-log_rank_test <- survdiff(Surv(week, arrest) ~ wexp, data = dat)
+log_rank_test <- survdiff(Surv(time, status) ~ treatment, data = dat)
 print(log_rank_test)
 ```
 
@@ -168,19 +172,19 @@ print(paste("RMST for Cohort B up to time 10:", rmst_B))
 
 ```
 
-### Showcase on the Rossi dataset
+### Showcase on the Veterans dataset
 
 ```{r}
-surv_obj <- with(dat, Surv(week, arrest))
-TIME_LIMIT = 52
+surv_obj <- with(dat, Surv(time, status))
+TIME_LIMIT = 500
 
-km_fit_A <- survfit(surv_obj ~ fin, data = dat, subset = (fin == "yes"))
-km_fit_B <- survfit(surv_obj ~ fin, data = dat, subset = (fin == "no"))
+km_fit_A <- survfit(surv_obj ~ treatment, data = dat, subset = (treatment == 'test'))
+km_fit_B <- survfit(surv_obj ~ treatment, data = dat, subset = (treatment == 'standard'))
 
 rmst_A <- calculate_rmst(km_fit_A, TIME_LIMIT)
 rmst_B <- calculate_rmst(km_fit_B, TIME_LIMIT)
 
 # Print the RMST results
-print(paste("RMST for Cohort A up to time 52:", rmst_A))
-print(paste("RMST for Cohort B up to time 52:", rmst_B))
+print(paste("RMST for Cohort A up to time ", TIME_LIMIT, " :", rmst_A))
+print(paste("RMST for Cohort B up to time ", TIME_LIMIT, " :", rmst_B))
 ```
