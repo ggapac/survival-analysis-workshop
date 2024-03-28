@@ -10,6 +10,7 @@ output:
 ```{r}
 library("randomForestSRC")
 library("survival")
+library("flexsurvreg")
 source("../src/util.R")
 
 dat <- read.csv("../data/veteran_preprocessed.csv")
