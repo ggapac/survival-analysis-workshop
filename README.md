@@ -41,7 +41,7 @@ We are going to introduce the main concepts of survival analysis, including:
 
 ## Software and Packages
 - **Required Software:** R, RStudio
-- **R Packages:** survival, ggplot2, stats, survminer, randomForestSRC, flexsurvreg
+- **R Packages:** survival, ggplot2, stats, survminer, randomForestSRC, flexsurvreg, pec
 
 ## Resources & Literature
 - Machine Learning for Survival Analysis: A Survey ([https://arxiv.org/abs/1708.04649](https://arxiv.org/abs/1708.04649))
