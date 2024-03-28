@@ -10,7 +10,8 @@ output:
 ```{r}
 library("randomForestSRC")
 library("survival")
-library("flexsurvreg")
+library("flexsurv")
+library("pec")
 source("../src/util.R")
 
 dat <- read.csv("../data/veteran_preprocessed.csv")
@@ -112,7 +113,7 @@ f_predict <- function(model_type, model, test_dat) {
         times <- pred[1, ]$.pred[[1]]$.time
         surv_probs <- surv_probs[order(times), ]
     } else if (model_type == "rfsrc") {
-        pred <- predictSurvProb(fitted, newdata=test_dat, times=unique(sort(test_dat$time)))
+        pred <- predictSurvProb(model, newdata=test_dat, times=unique(sort(test_dat$time)))
         t(pred)
     }
 }
