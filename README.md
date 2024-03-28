@@ -1,6 +1,6 @@
 # Workshop: Introduction to Survival Analysis
 
-This is a code repository for a workshop titled Introduction to Survival Analysis in a series of workshops orgnaized by the Data Science Initiative.
+This is a code repository for a workshop titled Introduction to Survival Analysis in a series of workshops held by the DataScience@UL-FRI Initiative.
 
 ## Workshop Details
 - **Date and Time:** March 28, 2024, 16:00 - 20:00
@@ -21,7 +21,8 @@ We are going to introduce the main concepts of survival analysis, including:
 - non-parametric models (Kaplan-Meier estimator)
 - parametric models (Exponential and Weibull)
 - semi-parametric models (Cox Proportional hazard)
-- machine learning approaches to predictive modeling and evaluation
+- survival machine learning approaches
+- predictive modeling and evaluation
 - designing your own study
 
 ## Workshop Agenda
